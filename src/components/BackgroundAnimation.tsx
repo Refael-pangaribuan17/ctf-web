@@ -17,10 +17,10 @@ const BackgroundAnimation: React.FC<BackgroundAnimationProps> = ({ className }) 
       
       {/* Animated digital streams */}
       <div className="absolute inset-0">
-        {Array.from({ length: 10 }).map((_, i) => (
+        {Array.from({ length: 20 }).map((_, i) => (
           <div 
             key={i}
-            className="absolute h-[50vh] w-px bg-gradient-to-b from-transparent via-cyber-blue/20 to-transparent"
+            className="absolute h-[70vh] w-px bg-gradient-to-b from-transparent via-cyber-blue/20 to-transparent animate-float-slow"
             style={{
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
@@ -28,6 +28,34 @@ const BackgroundAnimation: React.FC<BackgroundAnimationProps> = ({ className }) 
               opacity: 0.1 + Math.random() * 0.5
             }}
           />
+        ))}
+      </div>
+      
+      {/* Code rain effect */}
+      <div className="absolute inset-0 overflow-hidden">
+        {Array.from({ length: 15 }).map((_, i) => (
+          <div
+            key={`code-rain-${i}`}
+            className="absolute font-mono text-[8px] text-cyber-blue/20 whitespace-nowrap animate-data-flow overflow-hidden"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 50}%`,
+              height: `${100 + Math.random() * 400}px`,
+              width: `${10 + Math.random() * 20}px`,
+              animationDuration: `${15 + Math.random() * 25}s`,
+              opacity: 0.2 + Math.random() * 0.4
+            }}
+          >
+            {Array.from({ length: 80 }).map((_, j) => (
+              <div key={j} className="leading-tight">
+                {Math.random() > 0.5 ? "1" : "0"}
+                {Math.random() > 0.5 ? ">" : "<"}
+                {Math.random() > 0.5 ? "/" : "\\"}
+                {Math.random() > 0.5 ? "#" : "$"}
+                {Math.random() > 0.5 ? ";" : ":"}
+              </div>
+            ))}
+          </div>
         ))}
       </div>
       
@@ -74,6 +102,46 @@ const BackgroundAnimation: React.FC<BackgroundAnimationProps> = ({ className }) 
               animationDelay: `${Math.random() * 5}s`,
             }}
           />
+        ))}
+      </div>
+      
+      {/* Cyber hexagons */}
+      <div className="absolute inset-0">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div
+            key={`hex-${i}`}
+            className="absolute w-24 h-24 border border-cyber-blue/30 opacity-10"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              clipPath: "polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%)",
+              transform: `rotate(${Math.random() * 360}deg) scale(${0.5 + Math.random()})`,
+              boxShadow: "0 0 15px rgba(14,165,233,0.3)"
+            }}
+          />
+        ))}
+      </div>
+      
+      {/* Floating tech terms */}
+      <div className="absolute inset-0">
+        {[
+          "ENCRYPTION", "PROTOCOL", "FIREWALL", "EXPLOIT", "PAYLOAD", 
+          "BACKDOOR", "MALWARE", "BUFFER", "INJECTION", "ROOTKIT", 
+          "HASH", "DAEMON", "KEYLOGGER", "SANDBOX"
+        ].map((term, i) => (
+          <div
+            key={`term-${i}`}
+            className="absolute font-mono text-xs text-cyber-blue/20 animate-float-slow whitespace-nowrap"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              transform: `rotate(${Math.random() * 90 - 45}deg)`,
+              animationDelay: `${Math.random() * 8}s`,
+              animationDuration: `${8 + Math.random() * 10}s`
+            }}
+          >
+            {term}
+          </div>
         ))}
       </div>
     </div>
