@@ -10,6 +10,10 @@ import Base64Tool from '@/components/tools/Base64Tool';
 import HexConverter from '@/components/tools/HexConverter';
 import ROT13Tool from '@/components/tools/ROT13Tool';
 import BinaryConverter from '@/components/tools/BinaryConverter';
+import URLTool from '@/components/tools/URLTool';
+import HTTPHeaderTool from '@/components/tools/HTTPHeaderTool';
+import HashGeneratorTool from '@/components/tools/HashGeneratorTool';
+import XORTool from '@/components/tools/XORTool';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -62,34 +66,33 @@ const Tools = () => {
       icon: RotateCw,
       component: ROT13Tool
     },
-    // Placeholders for future implementation
     {
       id: 'url',
       title: 'URL Encoder/Decoder',
       description: 'Encode and decode URL components',
       icon: Globe,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: URLTool
     },
     {
       id: 'http',
       title: 'HTTP Header Inspector',
       description: 'Analyze HTTP requests and responses',
       icon: Network,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: HTTPHeaderTool
     },
     {
       id: 'hash',
       title: 'Hash Generator',
       description: 'Generate MD5, SHA-1, SHA-256 hashes',
       icon: Shield,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: HashGeneratorTool
     },
     {
       id: 'xor',
       title: 'XOR Cipher',
       description: 'Encrypt and decrypt data using XOR operations',
       icon: Key,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: XORTool
     }
   ];
 
