@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Wifi } from 'lucide-react';
+import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import ToolCard from '@/components/ToolCard';
 import CaesarCipher from '@/components/tools/CaesarCipher';
@@ -15,7 +16,7 @@ type Tool = {
   id: string;
   title: string;
   description: string;
-  icon: React.FC<any>;
+  icon: LucideIcon;
   component: React.FC;
 };
 
