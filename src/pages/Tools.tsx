@@ -8,6 +8,8 @@ import ToolCard from '@/components/ToolCard';
 import CaesarCipher from '@/components/tools/CaesarCipher';
 import Base64Tool from '@/components/tools/Base64Tool';
 import HexConverter from '@/components/tools/HexConverter';
+import ROT13Tool from '@/components/tools/ROT13Tool';
+import BinaryConverter from '@/components/tools/BinaryConverter';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -46,21 +48,21 @@ const Tools = () => {
       icon: Code,
       component: HexConverter
     },
-    // Placeholders for future implementation
     {
       id: 'binary',
       title: 'Binary Converter',
-      description: 'Convert between decimal, binary, and text formats',
+      description: 'Convert between decimal, binary, text, and hex formats',
       icon: Database,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: BinaryConverter
     },
     {
       id: 'rot13',
       title: 'ROT13 Encoder/Decoder',
       description: 'Encode or decode text using the ROT13 cipher algorithm',
       icon: RotateCw,
-      component: () => <div className="p-6 text-center text-gray-400">Coming soon...</div>
+      component: ROT13Tool
     },
+    // Placeholders for future implementation
     {
       id: 'url',
       title: 'URL Encoder/Decoder',
