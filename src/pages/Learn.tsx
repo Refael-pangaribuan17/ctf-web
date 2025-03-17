@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Lock, Key, Shield, Terminal, Network, Globe, Code, Database, Wifi } from 'lucide-react';
+import { Lock, Key, Shield, Terminal, Network, Globe, Code, Database, Wifi, Cpu, FileCode, Bug, Brain, FileDigit, FileLock, Search } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { cn } from '@/lib/utils';
@@ -361,50 +360,373 @@ const Learn = () => {
           </Card>
         </div>
       )
-    }
-  ];
+    },
+    {
+      id: "binary",
+      title: "Binary Exploitation",
+      description: "Learn about memory corruption and reverse engineering",
+      icon: Cpu,
+      content: (
+        <div className="space-y-6">
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Introduction to Binary Exploitation</CardTitle>
+              <CardDescription>Understanding memory vulnerabilities and exploitation techniques</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>
+                Binary exploitation involves identifying and exploiting vulnerabilities in compiled programs. 
+                These challenges test your understanding of computer memory, assembly language, and program execution flow.
+              </p>
+              
+              <h3 className="text-lg font-medium text-cyber-blue">Common Binary Exploitation Techniques</h3>
+              
+              <div className="space-y-3">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Buffer Overflows</h4>
+                  <p className="text-sm text-gray-300">
+                    A vulnerability that occurs when a program writes data beyond the allocated memory buffer's boundaries.
+                    Attackers can use this vulnerability to overwrite adjacent memory, potentially altering the program's execution flow.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`void vulnerable_function(char *input) {
+    char buffer[64]; // Only 64 bytes allocated
+    strcpy(buffer, input); // No bounds checking
+}`}
+                  </pre>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Return-Oriented Programming (ROP)</h4>
+                  <p className="text-sm text-gray-300">
+                    An exploitation technique that allows attackers to execute code in the presence of security defenses 
+                    by chaining together existing code fragments (gadgets) ending with return instructions.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Format String Vulnerabilities</h4>
+                  <p className="text-sm text-gray-300">
+                    Occur when user-supplied input is used directly as a format string in functions like printf().
+                    This can allow attackers to read from and write to arbitrary memory locations.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`// Vulnerable code
+printf(user_input); // user_input used as format string
 
-  return (
-    <main className="min-h-screen pb-20">
-      <BackgroundAnimation />
-      <Navbar />
-      
-      <div className="container mx-auto px-4 pt-24">
-        <div className="text-center mb-12 animate-fade-up">
-          <h1 className="text-4xl font-bold mb-4 text-gradient">Learn CTF Basics</h1>
-          <p className="text-gray-300 max-w-2xl mx-auto">
-            Explore the fundamentals of Capture The Flag competitions and build your cybersecurity skills.
-          </p>
-        </div>
-        
-        <div className="max-w-4xl mx-auto animate-fade-up animate-delay-200">
-          <Tabs defaultValue="crypto" className="w-full">
-            <TabsList className="grid grid-cols-2 md:grid-cols-4 mb-8">
-              {sections.map((section) => (
-                <TabsTrigger 
-                  key={section.id} 
-                  value={section.id}
-                  className={cn(
-                    "data-[state=active]:text-cyber-blue data-[state=active]:bg-cyber-blue/10",
-                    "flex items-center gap-2"
-                  )}
-                >
-                  <section.icon className="h-4 w-4" />
-                  <span>{section.title}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-            
-            {sections.map((section) => (
-              <TabsContent key={section.id} value={section.id} className="mt-6">
-                {section.content}
-              </TabsContent>
-            ))}
-          </Tabs>
-        </div>
-      </div>
-    </main>
-  );
-};
+// Secure code
+printf("%s", user_input); // Format string is fixed`}
+                  </pre>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Heap Exploitation</h4>
+                  <p className="text-sm text-gray-300">
+                    Involves manipulating dynamically allocated memory to exploit vulnerabilities in memory management,
+                    such as use-after-free, double free, and heap overflow bugs.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Binary Analysis Tools</CardTitle>
+              <CardDescription>Essential tools for reverse engineering and exploitation</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">GDB (GNU Debugger)</h4>
+                  <p className="text-sm text-gray-300">
+                    A powerful debugger for examining program execution, setting breakpoints, and analyzing memory.
+                    Extensions like PEDA, GEF, and pwndbg enhance GDB with features specific to exploitation.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`gdb ./vulnerable_program
+break main
+run
+x/20xw $esp  # Examine stack memory
+disassemble main`}
+                  </pre>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Ghidra</h4>
+                  <p className="text-sm text-gray-300">
+                    A free and open-source software reverse engineering suite developed by the NSA.
+                    Provides disassembly, decompilation, and analysis features to understand binary code.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">IDA Pro</h4>
+                  <p className="text-sm text-gray-300">
+                    Industry-standard disassembler and debugger used for reverse engineering binary files.
+                    Offers interactive and programmable disassembly features and multi-processor support.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Pwntools</h4>
+                  <p className="text-sm text-gray-300">
+                    A Python library specifically designed for rapid exploit development and CTF participation.
+                    Simplifies tasks like connecting to remote services, packing data, and generating shellcode.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`from pwn import *
 
-export default Learn;
+# Connect to a remote service
+conn = remote('example.com', 1337)
+
+# Create a ROP chain
+rop = ROP('./vulnerable_binary')
+rop.system(next(rop.find_gadget(['sh', 0])))
+
+# Send payload
+payload = flat('A' * 64, rop.chain())
+conn.sendline(payload)
+conn.interactive()`}
+                  </pre>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: "reverse",
+      title: "Reverse Engineering",
+      description: "Learn about disassembling and analyzing compiled code",
+      icon: FileCode,
+      content: (
+        <div className="space-y-6">
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Introduction to Reverse Engineering</CardTitle>
+              <CardDescription>Understanding compiled programs and their behavior</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>
+                Reverse engineering involves analyzing compiled programs to understand their functionality, 
+                identify vulnerabilities, or extract hidden information. In CTF competitions, reverse engineering 
+                challenges often require you to understand what a program does without having access to the original source code.
+              </p>
+              
+              <h3 className="text-lg font-medium text-cyber-blue">Common Reverse Engineering Concepts</h3>
+              
+              <div className="space-y-3">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Assembly Language</h4>
+                  <p className="text-sm text-gray-300">
+                    A low-level programming language with a strong correspondence between machine code instructions 
+                    and the assembly instructions. Understanding assembly is fundamental for reverse engineering.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`; x86 assembly example
+mov eax, 5      ; Move value 5 into eax register
+add eax, 3      ; Add 3 to eax (eax now = 8)
+cmp eax, 10     ; Compare eax with 10
+jl label        ; Jump to label if eax < 10`}
+                  </pre>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Static Analysis</h4>
+                  <p className="text-sm text-gray-300">
+                    Examining the program without executing it. This involves disassembling the binary, 
+                    analyzing code structure, identifying functions, and understanding control flow.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Dynamic Analysis</h4>
+                  <p className="text-sm text-gray-300">
+                    Executing the program in a controlled environment to observe its behavior. 
+                    This includes monitoring system calls, tracing execution flow, and analyzing memory usage.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Decompilation</h4>
+                  <p className="text-sm text-gray-300">
+                    Converting compiled machine code back into a higher-level representation that resembles 
+                    the original source code. Tools like Ghidra and IDA Pro provide powerful decompilation capabilities.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Reverse Engineering Approaches</CardTitle>
+              <CardDescription>Strategies for tackling reverse engineering challenges</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ol className="list-decimal list-inside space-y-3">
+                <li className="text-gray-300">
+                  <span className="font-medium text-white">Identify the program type</span> - Is it a Windows executable, Linux ELF, or something else?
+                </li>
+                <li className="text-gray-300">
+                  <span className="font-medium text-white">Check for obfuscation or packing</span> - Tools like UPX, PEiD, or Detect It Easy can help identify if the program is packed.
+                </li>
+                <li className="text-gray-300">
+                  <span className="font-medium text-white">Look for strings</span> - Use tools like <code>strings</code> command in Linux to extract readable text that might provide clues.
+                </li>
+                <li className="text-gray-300">
+                  <span className="font-medium text-white">Use decompilers</span> - Tools like Ghidra can convert assembly code to a higher-level representation that's easier to understand.
+                </li>
+                <li className="text-gray-300">
+                  <span className="font-medium text-white">Identify key functions</span> - Look for functions that handle input validation, cryptographic operations, or flag checking.
+                </li>
+              </ol>
+              
+              <div className="glass-panel p-4 mt-4">
+                <h4 className="font-bold mb-1">Example Workflow</h4>
+                <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                  {`# Basic static analysis steps
+file ./unknown_binary      # Determine file type
+strings ./unknown_binary   # Extract readable strings
+objdump -d ./unknown_binary # Disassemble the binary
+
+# Dynamic analysis
+strace ./unknown_binary    # Trace system calls
+ltrace ./unknown_binary    # Trace library calls
+gdb ./unknown_binary       # Debug the binary`}
+                </pre>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    },
+    {
+      id: "mobile",
+      title: "Mobile Security",
+      description: "Learn about Android and iOS application security",
+      icon: FileDigit,
+      content: (
+        <div className="space-y-6">
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Mobile Application Security</CardTitle>
+              <CardDescription>Understanding Android and iOS security models</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p>
+                Mobile security in CTF challenges involves analyzing and exploiting vulnerabilities in Android 
+                and iOS applications. This requires understanding mobile application architectures, security 
+                mechanisms, and common vulnerabilities.
+              </p>
+              
+              <h3 className="text-lg font-medium text-cyber-blue">Android Application Analysis</h3>
+              
+              <div className="space-y-3">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">APK Structure</h4>
+                  <p className="text-sm text-gray-300">
+                    Android applications (APKs) are essentially ZIP archives containing compiled code (DEX files),
+                    resources, assets, and a manifest file that defines application permissions and components.
+                  </p>
+                  <pre className="mt-2 p-2 bg-black/30 rounded-md text-xs text-gray-300 overflow-x-auto">
+                    {`# Extract an APK
+apktool d application.apk
+
+# APK structure
+AndroidManifest.xml   # Application configuration
+classes.dex           # Compiled Java/Kotlin code
+res/                  # Resources (layouts, strings, etc.)
+assets/               # Raw assets (files, databases, etc.)`}
+                  </pre>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Decompiling Android Apps</h4>
+                  <p className="text-sm text-gray-300">
+                    Reverse engineering Android applications typically involves decompiling DEX code back to Java 
+                    source code or smali (an intermediate representation). Tools like jadx, apktool, and dex2jar 
+                    are commonly used for this purpose.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Common Android Vulnerabilities</h4>
+                  <p className="text-sm text-gray-300">
+                    <ul className="list-disc list-inside">
+                      <li>Insecure data storage (unencrypted databases, shared preferences)</li>
+                      <li>Inadequate cryptography implementation</li>
+                      <li>Exported components (Activities, Services, BroadcastReceivers)</li>
+                      <li>Insecure WebView configurations</li>
+                      <li>Hardcoded credentials and API keys</li>
+                    </ul>
+                  </p>
+                </div>
+              </div>
+              
+              <h3 className="text-lg font-medium text-cyber-blue mt-6">iOS Application Analysis</h3>
+              
+              <div className="space-y-3">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">IPA Structure</h4>
+                  <p className="text-sm text-gray-300">
+                    iOS applications (IPAs) are also archives containing compiled code, resources, and configuration files.
+                    The main executable is usually compiled to ARM assembly, making analysis more challenging.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Reverse Engineering iOS Apps</h4>
+                  <p className="text-sm text-gray-300">
+                    Tools like Hopper Disassembler, IDA Pro, and Ghidra can be used to analyze iOS binaries.
+                    For runtime analysis, tools like Frida and Cycript are valuable for hooking into app functions.
+                  </p>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Common iOS Vulnerabilities</h4>
+                  <p className="text-sm text-gray-300">
+                    <ul className="list-disc list-inside">
+                      <li>Insecure data storage (unencrypted NSUserDefaults, Keychain misuse)</li>
+                      <li>Lacking jailbreak detection</li>
+                      <li>Insecure local authentication</li>
+                      <li>Weak transport layer security</li>
+                      <li>Sensitive information in binary files</li>
+                    </ul>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="cyber-panel border-0">
+            <CardHeader>
+              <CardTitle>Mobile Security Tools</CardTitle>
+              <CardDescription>Essential tools for mobile application analysis</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">Android Tools</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-300 space-y-2">
+                    <li><strong>Apktool</strong>: Disassembles resources and DEX to smali</li>
+                    <li><strong>Jadx</strong>: Decompiles APK files to Java source</li>
+                    <li><strong>MobSF</strong>: Automated mobile application security assessment</li>
+                    <li><strong>ADB</strong>: Android Debug Bridge for interacting with devices</li>
+                    <li><strong>Drozer</strong>: Security assessment framework for Android</li>
+                  </ul>
+                </div>
+                
+                <div className="glass-panel p-4">
+                  <h4 className="font-bold mb-1">iOS Tools</h4>
+                  <ul className="list-disc list-inside text-sm text-gray-300 space-y-2">
+                    <li><strong>Clutch</strong>: Extracts decrypted IPAs from jailbroken devices</li>
+                    <li><strong>Frida</strong>: Dynamic instrumentation toolkit</li>
+                    <li><strong>Cydia Impactor</strong>: Installs IPAs on non-jailbroken devices</li>
+                    <li><strong>Hopper</strong>: Disassembler and decompiler for iOS binaries</li>
+                    <li><strong>iProxy</strong>: Proxy connections for iOS analysis</li>
+                  </ul>
+                </div>
+              </div>
