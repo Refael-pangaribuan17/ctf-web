@@ -52,7 +52,7 @@ To run this project locally:
 
 1. **Clone the repository**:
     ```bash
-    git clone https://github.com/yourusername/ctf-toolkit.git
+    git clone https://github.com/Refael-pangaribuan17/ctf-toolkit.git
     ```
 
 2. **Navigate into the project directory**:
