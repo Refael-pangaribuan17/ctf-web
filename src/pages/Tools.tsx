@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal } from 'lucide-react';
+import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import ToolCard from '@/components/ToolCard';
@@ -14,6 +14,10 @@ import URLTool from '@/components/tools/URLTool';
 import HTTPHeaderTool from '@/components/tools/HTTPHeaderTool';
 import HashGeneratorTool from '@/components/tools/HashGeneratorTool';
 import XORTool from '@/components/tools/XORTool';
+import SteganographyTool from '@/components/tools/SteganographyTool';
+import WifiAnalyzerTool from '@/components/tools/WifiAnalyzerTool';
+import MetadataExtractorTool from '@/components/tools/MetadataExtractorTool';
+import JWTDecoderTool from '@/components/tools/JWTDecoderTool';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -93,6 +97,34 @@ const Tools = () => {
       description: 'Encrypt and decrypt data using XOR operations',
       icon: Key,
       component: XORTool
+    },
+    {
+      id: 'steg',
+      title: 'Steganography Detector',
+      description: 'Analyze images for hidden steganographic content',
+      icon: Image,
+      component: SteganographyTool
+    },
+    {
+      id: 'wifi',
+      title: 'WiFi Analyzer',
+      description: 'Tools for WiFi packet and handshake analysis',
+      icon: Wifi,
+      component: WifiAnalyzerTool
+    },
+    {
+      id: 'metadata',
+      title: 'Metadata Extractor',
+      description: 'Extract metadata from images and other files',
+      icon: FileSearch,
+      component: MetadataExtractorTool
+    },
+    {
+      id: 'jwt',
+      title: 'JWT Decoder',
+      description: 'Decode and analyze JSON Web Tokens',
+      icon: Braces,
+      component: JWTDecoderTool
     }
   ];
 
