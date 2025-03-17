@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces } from 'lucide-react';
+import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces, KeyRound, Bug, Search } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import ToolCard from '@/components/ToolCard';
@@ -18,6 +18,9 @@ import SteganographyTool from '@/components/tools/SteganographyTool';
 import WifiAnalyzerTool from '@/components/tools/WifiAnalyzerTool';
 import MetadataExtractorTool from '@/components/tools/MetadataExtractorTool';
 import JWTDecoderTool from '@/components/tools/JWTDecoderTool';
+import PasswordCrackingTool from '@/components/tools/PasswordCrackingTool';
+import WebExploitTool from '@/components/tools/WebExploitTool';
+import ReconTool from '@/components/tools/ReconTool';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -125,6 +128,27 @@ const Tools = () => {
       description: 'Decode and analyze JSON Web Tokens',
       icon: Braces,
       component: JWTDecoderTool
+    },
+    {
+      id: 'password',
+      title: 'Password Cracker',
+      description: 'Recover passwords from various hash types',
+      icon: KeyRound,
+      component: PasswordCrackingTool
+    },
+    {
+      id: 'webexploit',
+      title: 'Web Exploitation',
+      description: 'Tools for testing SQL injection, XSS, and other web vulnerabilities',
+      icon: Bug,
+      component: WebExploitTool
+    },
+    {
+      id: 'recon',
+      title: 'Reconnaissance',
+      description: 'DNS, WHOIS, and port scanning tools for information gathering',
+      icon: Search,
+      component: ReconTool
     }
   ];
 
