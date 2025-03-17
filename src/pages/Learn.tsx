@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -730,3 +731,49 @@ assets/               # Raw assets (files, databases, etc.)`}
                   </ul>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </div>
+      )
+    }
+  ];
+
+  return (
+    <div className="min-h-screen bg-black text-white overflow-hidden">
+      <Navbar />
+      <div className="relative container mx-auto px-4 py-12 z-10">
+        <h1 className="text-4xl font-bold text-center mb-12 cyber-glitch-1">Learn Cybersecurity Skills</h1>
+        
+        <Tabs defaultValue={sections[0].id} className="w-full">
+          <TabsList className="grid grid-cols-3 md:grid-cols-7 mb-8">
+            {sections.map((section) => (
+              <TabsTrigger 
+                key={section.id} 
+                value={section.id}
+                className={cn(
+                  "flex flex-col items-center justify-center space-y-2 p-4 rounded-md",
+                  "data-[state=active]:bg-cyan-900/50 data-[state=active]:shadow-inner data-[state=active]:shadow-cyan-500/40"
+                )}
+              >
+                <section.icon className="w-6 h-6 text-cyan-500" />
+                <span className="text-xs sm:text-sm">{section.title}</span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          
+          {sections.map((section) => (
+            <TabsContent key={section.id} value={section.id} className="pt-2">
+              <h2 className="text-3xl font-bold cyber-glitch-2 mb-8">{section.title}</h2>
+              <p className="text-lg text-gray-300 mb-8">{section.description}</p>
+              
+              {section.content}
+            </TabsContent>
+          ))}
+        </Tabs>
+      </div>
+      <BackgroundAnimation />
+    </div>
+  );
+};
+
+export default Learn;
