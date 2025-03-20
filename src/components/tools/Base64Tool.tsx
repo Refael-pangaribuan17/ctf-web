@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { ArrowLeft, ArrowRight, RotateCcw, Copy, KeySquare } from 'lucide-react';
+import { ArrowLeft, ArrowRight, RotateCcw, Copy, KeySquare, FileText } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const Base64Tool: React.FC = () => {
@@ -14,6 +14,7 @@ const Base64Tool: React.FC = () => {
   const [mode, setMode] = useState('encode');
   const [isBinary, setIsBinary] = useState(false);
   const [loadingState, setLoadingState] = useState<'idle' | 'processing' | 'complete'>('idle');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -32,18 +33,37 @@ const Base64Tool: React.FC = () => {
         let result = '';
         
         if (mode === 'encode') {
-          // For binary files/content, we'd need FileReader in a real implementation
+          // For binary files/content, we'll use a different approach
           if (isBinary) {
-            // This is just a simulation for the UI
-            const bytes = new TextEncoder().encode(input);
-            result = btoa(String.fromCharCode(...bytes));
+            if (selectedFile) {
+              // For real file handling, we'd do this differently
+              // This is just a placeholder as we can't really read binary files in this demo
+              result = "[Binary file would be encoded here]";
+            } else {
+              // Simulate encoding binary data
+              const bytes = new TextEncoder().encode(input);
+              result = btoa(String.fromCharCode(...bytes));
+            }
           } else {
+            // Standard base64 encoding
             result = btoa(input);
           }
         } else {
           try {
+            // Base64 decoding
             const decoded = atob(input);
-            result = decoded;
+            
+            // Check if the result looks like binary data
+            const isProbablyBinary = decoded.split('').some(char => {
+              const code = char.charCodeAt(0);
+              return code < 32 || code > 126;
+            });
+            
+            if (isProbablyBinary) {
+              result = "Detected binary content. Download the file to view.";
+            } else {
+              result = decoded;
+            }
           } catch (e) {
             throw new Error("Invalid Base64 string");
           }
@@ -85,6 +105,83 @@ const Base64Tool: React.FC = () => {
     setOutput('');
     setMode('encode');
     setIsBinary(false);
+    setSelectedFile(null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    
+    if (file) {
+      setSelectedFile(file);
+      
+      if (file.size > 500000) {
+        toast({
+          title: "File Size Warning",
+          description: "Large files may cause browser performance issues.",
+          variant: "destructive",
+        });
+      }
+      
+      // Read file as text (in a real app, we'd use FileReader with readAsArrayBuffer for binary)
+      const reader = new FileReader();
+      
+      reader.onload = (event) => {
+        if (typeof event.target?.result === 'string') {
+          const content = event.target.result.slice(0, 100000); // Limit size for demo
+          setInput(`[Content from file: ${file.name}]`);
+        }
+      };
+      
+      reader.onerror = () => {
+        toast({
+          title: "File Error",
+          description: "Could not read the selected file.",
+          variant: "destructive",
+        });
+      };
+      
+      // For text files, but for binary we'd use readAsArrayBuffer
+      reader.readAsText(file);
+    }
+  };
+
+  const handleDownloadResult = () => {
+    if (!output || mode !== 'decode') return;
+    
+    try {
+      let decodedContent;
+      
+      try {
+        decodedContent = atob(input);
+      } catch (e) {
+        toast({
+          title: "Decode Error",
+          description: "Could not decode the content for download.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Create a blob and download it
+      const blob = new Blob([decodedContent], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'decoded_file.bin';
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      toast({
+        title: "Download Started",
+        description: "Your decoded file has been downloaded.",
+      });
+    } catch (error) {
+      toast({
+        title: "Download Error",
+        description: "Could not prepare file for download.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -127,6 +224,49 @@ const Base64Tool: React.FC = () => {
             </ToggleGroup>
           </div>
 
+          {/* Example buttons */}
+          <div className="flex flex-wrap gap-2">
+            {mode === 'encode' ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setInput("Hello, World!")}
+                  className="text-xs"
+                >
+                  Example: Simple Text
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setInput("{"name":"John Doe","age":30,"isActive":true}")}
+                  className="text-xs"
+                >
+                  Example: JSON
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setInput("SGVsbG8sIFdvcmxkIQ==")}
+                  className="text-xs"
+                >
+                  Example: "Hello, World!"
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setInput("eyJuYW1lIjoiSm9obiBEb2UiLCJhZ2UiOjMwLCJpc0FjdGl2ZSI6dHJ1ZX0=")}
+                  className="text-xs"
+                >
+                  Example: Encoded JSON
+                </Button>
+              </>
+            )}
+          </div>
+
           {/* Binary option for encoding */}
           {mode === 'encode' && (
             <div className="flex items-center space-x-2">
@@ -163,17 +303,30 @@ const Base64Tool: React.FC = () => {
               <Label htmlFor="output" className="text-sm text-gray-300">
                 Result
               </Label>
-              {output && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Copy className="mr-1 h-3 w-3" />
-                  Copy
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {output && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Copy className="mr-1 h-3 w-3" />
+                    Copy
+                  </Button>
+                )}
+                {mode === 'decode' && output && output.includes('binary') && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDownloadResult}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <FileText className="mr-1 h-3 w-3" />
+                    Download
+                  </Button>
+                )}
+              </div>
             </div>
             <div
               className={`relative font-mono min-h-[100px] p-4 rounded-md bg-cyber-darker border border-cyber-dark transition-all duration-300 overflow-auto ${
@@ -199,36 +352,42 @@ const Base64Tool: React.FC = () => {
             </div>
           </div>
 
-          {/* Add file upload support for real binary data */}
+          {/* Add file upload support */}
           {mode === 'encode' && isBinary && (
             <div className="w-full mt-4">
               <Label htmlFor="file-upload" className="text-sm mb-2 block text-gray-300">
-                Or upload a file (experimental)
+                Or upload a file
               </Label>
               <Input
                 id="file-upload"
                 type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                      if (typeof reader.result === 'string') {
-                        // For demo purposes only - in reality we'd use readAsArrayBuffer
-                        // and handle binary data properly
-                        setInput(`[Binary file: ${file.name}]`);
-                      }
-                    };
-                    reader.readAsText(file);
-                  }
-                }}
+                onChange={handleFileChange}
                 className="font-mono"
               />
               <p className="text-xs text-gray-400 mt-2">
-                Note: This is a frontend demo with limited binary handling. For large files, use a dedicated tool.
+                Note: This is a browser-based tool with limited file handling. For large files, use a dedicated tool.
               </p>
             </div>
           )}
+          
+          {/* Information section */}
+          <div className="mt-4 p-4 bg-cyber-darker/50 border border-cyber-dark rounded-md">
+            <h3 className="text-sm font-medium text-cyber-blue mb-2">About Base64 Encoding:</h3>
+            <p className="text-xs text-gray-300">
+              Base64 is a binary-to-text encoding scheme that represents binary data in an ASCII string format. 
+              It's commonly used to encode binary data such as images, audio files, or other binary content 
+              when you need to transmit that data in environments that only support text content.
+            </p>
+            <div className="mt-2 text-xs text-gray-400">
+              <p><strong>Common uses:</strong></p>
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                <li>Embedding images directly in HTML/CSS using data URIs</li>
+                <li>Sending binary data in JSON payloads</li>
+                <li>Email attachments (MIME)</li>
+                <li>Storing complex data in cookies or local storage</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

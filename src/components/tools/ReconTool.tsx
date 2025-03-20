@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,16 +33,13 @@ const ReconTool: React.FC = () => {
 
   const extractDomain = (url: string) => {
     try {
-      // If it's already a domain without protocol, just return it
       if (!url.includes('://') && !url.includes(' ')) {
         return url.trim();
       }
       
-      // Try to parse as URL
       const parsed = new URL(url.startsWith('http') ? url : `http://${url}`);
       return parsed.hostname;
     } catch (e) {
-      // Return original if can't parse
       return url.trim();
     }
   };
@@ -72,74 +68,118 @@ const ReconTool: React.FC = () => {
     
     setIsLoading(true);
     
-    // Simulate API request with timeout
     setTimeout(() => {
       const domain = extractDomain(target);
+      
       const fakeWhoisData = {
         "Domain Name": domain,
-        "Registry Domain ID": `${Math.random().toString(36).substring(2, 15)}_DOMAIN_COM-VRSN`,
+        "Registry Domain ID": `${domain.replace(/\./g, "")}-DOMAIN-COM-VRSN`,
         "Registrar WHOIS Server": "whois.registrar.com",
         "Registrar URL": "http://www.registrar.com",
-        "Updated Date": "2022-09-15T08:30:45Z",
-        "Creation Date": "2005-03-28T07:12:25Z",
-        "Registrar Registration Expiration Date": "2023-03-28T07:12:25Z",
-        "Registrar": "Some Registrar, Inc.",
+        "Updated Date": "2023-04-15T08:30:45Z",
+        "Creation Date": "2010-03-28T07:12:25Z",
+        "Registrar Registration Expiration Date": "2025-03-28T07:12:25Z",
+        "Registrar": "Example Registrar, Inc.",
         "Registrar Abuse Contact Email": `abuse@${domain}`,
         "Registrar Abuse Contact Phone": "+1.5555555555",
         "Domain Status": "clientTransferProhibited",
-        "Registry Registrant ID": `RT_${Math.random().toString(36).substring(2, 8)}`,
+        "Registry Registrant ID": `RT_${domain.replace(/\./g, "")}`,
         "Registrant Name": "Domain Administrator",
-        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} CORPORATION`,
-        "Registrant Street": "123 Example St",
-        "Registrant City": "Anytown",
+        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} ORGANIZATION`,
+        "Registrant Street": "123 Business Street",
+        "Registrant City": "San Francisco",
         "Registrant State/Province": "CA",
-        "Registrant Postal Code": "90210",
+        "Registrant Postal Code": "94105",
         "Registrant Country": "US",
         "Registrant Phone": "+1.5555551234",
         "Registrant Email": `admin@${domain}`,
         "Name Server 1": `ns1.${domain}`,
-        "Name Server 2": `ns2.${domain}`,
+        "Name Server 2": `ns2.${domain}`
       };
       
       const fakeDnsData = {
-        "A": [`203.0.113.${Math.floor(Math.random() * 255)}`, `203.0.113.${Math.floor(Math.random() * 255)}`],
-        "AAAA": [`2001:db8::${Math.floor(Math.random() * 9999)}`, `2001:db8::${Math.floor(Math.random() * 9999)}`],
-        "MX": [`mail.${domain}`, `mail2.${domain}`],
+        "A": [`104.21.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`, `172.67.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`],
+        "AAAA": [`2606:4700:3030::${Math.floor(Math.random() * 9999)}:${Math.floor(Math.random() * 9999)}`, `2606:4700:3031::${Math.floor(Math.random() * 9999)}:${Math.floor(Math.random() * 9999)}`],
+        "MX": [`alt1.aspmx.l.google.com.`, `alt2.aspmx.l.google.com.`],
         "NS": [`ns1.${domain}`, `ns2.${domain}`],
-        "TXT": [`v=spf1 include:_spf.${domain} ~all`, `google-site-verification=${Math.random().toString(36).substring(2, 15)}`],
-        "CNAME": [`www.${domain}`],
-        "SOA": [`ns1.${domain} hostmaster.${domain} ${Date.now()} 10800 3600 604800 38400`]
+        "TXT": [`v=spf1 include:_spf.google.com include:sendgrid.net ~all`, `google-site-verification=Jd4r-GszEpuG3BSIBxFwZcrvVzrKuDAA5-EnPbPdkjI`],
+        "CAA": [`0 issue "letsencrypt.org"`, `0 issue "pki.goog"`],
+        "SOA": [`ns1.${domain} hostmaster.${domain} ${Math.floor(Date.now()/1000)} 10800 3600 604800 38400`]
       };
       
       const fakePortsData = [
         { port: 80, service: "HTTP", state: "open" },
         { port: 443, service: "HTTPS", state: "open" },
         { port: 21, service: "FTP", state: "closed" },
-        { port: 22, service: "SSH", state: Math.random() > 0.7 ? "open" : "closed" },
-        { port: 25, service: "SMTP", state: Math.random() > 0.5 ? "open" : "filtered" },
-        { port: 53, service: "DNS", state: Math.random() > 0.7 ? "open" : "closed" },
+        { port: 22, service: "SSH", state: domain.includes('github') ? "open" : "filtered" },
+        { port: 25, service: "SMTP", state: domain.includes('mail') ? "open" : "filtered" },
+        { port: 53, service: "DNS", state: domain.includes('ns') ? "open" : "closed" },
         { port: 110, service: "POP3", state: "closed" },
         { port: 143, service: "IMAP", state: "closed" },
         { port: 3306, service: "MySQL", state: "filtered" },
-        { port: 8080, service: "HTTP-Proxy", state: Math.random() > 0.8 ? "open" : "closed" },
+        { port: 8080, service: "HTTP-Proxy", state: "closed" },
       ];
       
-      const fakeGeoIpData = {
-        ip: `203.0.113.${Math.floor(Math.random() * 255)}`,
-        city: ["New York", "London", "Tokyo", "Sydney", "Berlin"][Math.floor(Math.random() * 5)],
-        country: ["United States", "United Kingdom", "Japan", "Australia", "Germany"][Math.floor(Math.random() * 5)],
-        timezone: ["America/New_York", "Europe/London", "Asia/Tokyo", "Australia/Sydney", "Europe/Berlin"][Math.floor(Math.random() * 5)],
-        latitude: (Math.random() * 180 - 90).toFixed(4),
-        longitude: (Math.random() * 360 - 180).toFixed(4),
-        isp: ["Cloudflare", "Amazon AWS", "Google Cloud", "Microsoft Azure", "Digital Ocean"][Math.floor(Math.random() * 5)],
+      const ipParts = domain.split('.');
+      const fakeIp = `${ipParts.length > 1 ? '104.21' : '192.168'}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+
+      let geoData = {
+        ip: fakeIp,
+        city: "San Francisco",
+        country: "United States",
+        timezone: "America/Los_Angeles",
+        latitude: 37.7749,
+        longitude: -122.4194,
+        isp: "Cloudflare, Inc."
       };
       
-      // Set all results at once
+      if (domain.endsWith('.uk')) {
+        geoData = {
+          ip: fakeIp,
+          city: "London",
+          country: "United Kingdom",
+          timezone: "Europe/London",
+          latitude: 51.5074,
+          longitude: -0.1278,
+          isp: "British Telecom"
+        };
+      } else if (domain.endsWith('.jp')) {
+        geoData = {
+          ip: fakeIp,
+          city: "Tokyo",
+          country: "Japan",
+          timezone: "Asia/Tokyo",
+          latitude: 35.6762,
+          longitude: 139.6503,
+          isp: "NTT Communications"
+        };
+      } else if (domain.endsWith('.de')) {
+        geoData = {
+          ip: fakeIp,
+          city: "Berlin",
+          country: "Germany",
+          timezone: "Europe/Berlin",
+          latitude: 52.5200,
+          longitude: 13.4050,
+          isp: "Deutsche Telekom"
+        };
+      } else if (domain.endsWith('.au')) {
+        geoData = {
+          ip: fakeIp,
+          city: "Sydney",
+          country: "Australia",
+          timezone: "Australia/Sydney",
+          latitude: -33.8688,
+          longitude: 151.2093,
+          isp: "Telstra Corporation"
+        };
+      }
+      
       setResults({
         whois: fakeWhoisData,
         dns: fakeDnsData,
         ports: fakePortsData,
-        geoip: fakeGeoIpData
+        geoip: geoData
       });
       
       setIsLoading(false);
@@ -228,7 +268,7 @@ const ReconTool: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Note: This tool performs passive reconnaissance without sending packets to the target. All scans comply with legal and ethical guidelines.
+            Note: This tool performs simulated reconnaissance for educational purposes only.
           </p>
         </form>
 
@@ -241,7 +281,6 @@ const ReconTool: React.FC = () => {
               <TabsTrigger value="geoip">GeoIP</TabsTrigger>
             </TabsList>
             
-            {/* WHOIS Tab */}
             <TabsContent value="whois" className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">WHOIS Information</h3>
@@ -272,7 +311,6 @@ const ReconTool: React.FC = () => {
               )}
             </TabsContent>
             
-            {/* DNS Tab */}
             <TabsContent value="dns" className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">DNS Records</h3>
@@ -309,7 +347,6 @@ const ReconTool: React.FC = () => {
               )}
             </TabsContent>
             
-            {/* Ports Tab */}
             <TabsContent value="ports" className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Port Scan Results</h3>
@@ -368,7 +405,6 @@ const ReconTool: React.FC = () => {
               </div>
             </TabsContent>
             
-            {/* GeoIP Tab */}
             <TabsContent value="geoip" className="space-y-4">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium">Geographic Location</h3>
@@ -418,25 +454,31 @@ const ReconTool: React.FC = () => {
                         </div>
                         <div className="grid grid-cols-2">
                           <span className="text-sm text-gray-400">Coordinates:</span>
-                          <span className="text-sm font-mono">
-                            {results.geoip.latitude}, {results.geoip.longitude}
-                          </span>
+                          <span className="text-sm font-mono">{results.geoip.latitude}, {results.geoip.longitude}</span>
                         </div>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden flex items-center justify-center p-4 min-h-[200px]">
-                    <div className="text-center">
-                      <Globe className="h-16 w-16 mx-auto mb-2 text-cyber-blue/50" />
-                      <p className="text-sm text-gray-400">Interactive map would be displayed here.</p>
-                      <p className="text-xs text-gray-500 mt-2">Coordinates: {results.geoip.latitude}, {results.geoip.longitude}</p>
-                      <Button className="mt-4 text-xs" variant="outline" size="sm" asChild>
-                        <a href={`https://www.google.com/maps/search/?api=1&query=${results.geoip.latitude},${results.geoip.longitude}`} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-3 w-3 mr-1" />
-                          View on Google Maps
-                        </a>
-                      </Button>
+                  <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
+                    <div className="p-2 border-b border-cyber-dark bg-cyber-blue/10">
+                      <h4 className="font-medium flex items-center">
+                        <Globe className="h-4 w-4 mr-1 text-cyber-blue" />
+                        Map View
+                      </h4>
+                    </div>
+                    <div className="p-3 h-48 bg-gray-800 flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="mb-2 text-cyber-blue">
+                          <MapPin className="h-8 w-8 mx-auto" />
+                        </div>
+                        <p className="text-sm text-gray-400">
+                          Location: {results.geoip.city}, {results.geoip.country}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          ({results.geoip.latitude}, {results.geoip.longitude})
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -450,3 +492,4 @@ const ReconTool: React.FC = () => {
 };
 
 export default ReconTool;
+
