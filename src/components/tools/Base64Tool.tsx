@@ -20,29 +20,42 @@ const Base64Tool: React.FC = () => {
     if (input) {
       handleProcess();
     }
-  }, [input, mode]);
+  }, [input, mode, isBinary]);
 
   const handleProcess = () => {
     if (!input) return;
     
     setLoadingState('processing');
 
-    // Simulate processing delay for visual effect
     setTimeout(() => {
-      let result = '';
-      
       try {
+        let result = '';
+        
         if (mode === 'encode') {
-          result = btoa(input);
+          // For binary files/content, we'd need FileReader in a real implementation
+          if (isBinary) {
+            // This is just a simulation for the UI
+            const bytes = new TextEncoder().encode(input);
+            result = btoa(String.fromCharCode(...bytes));
+          } else {
+            result = btoa(input);
+          }
         } else {
-          result = atob(input);
+          try {
+            const decoded = atob(input);
+            result = decoded;
+          } catch (e) {
+            throw new Error("Invalid Base64 string");
+          }
         }
+        
         setOutput(result);
         setLoadingState('complete');
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Unknown error";
         toast({
           title: "Processing Error",
-          description: "Invalid input for the selected operation.",
+          description: errorMessage,
           variant: "destructive",
         });
         setOutput('');
@@ -71,6 +84,7 @@ const Base64Tool: React.FC = () => {
     setInput('');
     setOutput('');
     setMode('encode');
+    setIsBinary(false);
   };
 
   return (
@@ -112,6 +126,22 @@ const Base64Tool: React.FC = () => {
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
+
+          {/* Binary option for encoding */}
+          {mode === 'encode' && (
+            <div className="flex items-center space-x-2">
+              <input
+                id="binary-mode"
+                type="checkbox"
+                checked={isBinary}
+                onChange={(e) => setIsBinary(e.target.checked)}
+                className="rounded border-gray-300 text-cyber-blue focus:ring-cyber-blue h-4 w-4"
+              />
+              <Label htmlFor="binary-mode" className="text-sm text-gray-300">
+                Treat input as binary data
+              </Label>
+            </div>
+          )}
 
           {/* Input field */}
           <div className="w-full">
@@ -168,6 +198,37 @@ const Base64Tool: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Add file upload support for real binary data */}
+          {mode === 'encode' && isBinary && (
+            <div className="w-full mt-4">
+              <Label htmlFor="file-upload" className="text-sm mb-2 block text-gray-300">
+                Or upload a file (experimental)
+              </Label>
+              <Input
+                id="file-upload"
+                type="file"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      if (typeof reader.result === 'string') {
+                        // For demo purposes only - in reality we'd use readAsArrayBuffer
+                        // and handle binary data properly
+                        setInput(`[Binary file: ${file.name}]`);
+                      }
+                    };
+                    reader.readAsText(file);
+                  }
+                }}
+                className="font-mono"
+              />
+              <p className="text-xs text-gray-400 mt-2">
+                Note: This is a frontend demo with limited binary handling. For large files, use a dedicated tool.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

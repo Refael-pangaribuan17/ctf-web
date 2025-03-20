@@ -35,7 +35,12 @@ const URLTool: React.FC = () => {
         if (mode === 'encode') {
           result = encodeURIComponent(input);
         } else {
-          result = decodeURIComponent(input);
+          // Catch potential decode errors
+          try {
+            result = decodeURIComponent(input);
+          } catch (e) {
+            throw new Error("Invalid URL-encoded string. Make sure your input contains valid URL encoding.");
+          }
         }
         
         setOutput(result);
@@ -46,9 +51,10 @@ const URLTool: React.FC = () => {
           setLoadingState('idle');
         }, 500);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Invalid input for the selected operation.";
         toast({
           title: "Processing Error",
-          description: "Invalid input for the selected operation.",
+          description: errorMessage,
           variant: "destructive",
         });
         setOutput('');
@@ -71,6 +77,16 @@ const URLTool: React.FC = () => {
     setInput('');
     setOutput('');
     setMode('encode');
+  };
+
+  const exampleEncodeClick = () => {
+    setInput("https://example.com/path?name=John Doe&age=25");
+    setMode('encode');
+  };
+  
+  const exampleDecodeClick = () => {
+    setInput("https%3A%2F%2Fexample.com%2Fpath%3Fname%3DJohn%20Doe%26age%3D25");
+    setMode('decode');
   };
 
   return (
@@ -111,6 +127,26 @@ const URLTool: React.FC = () => {
                 Decode
               </ToggleGroupItem>
             </ToggleGroup>
+          </div>
+
+          {/* Examples */}
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exampleEncodeClick}
+              className="text-xs"
+            >
+              Example: Encode URL
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exampleDecodeClick}
+              className="text-xs"
+            >
+              Example: Decode URL
+            </Button>
           </div>
 
           {/* Input field */}
@@ -168,6 +204,29 @@ const URLTool: React.FC = () => {
                     loadingState === 'processing' ? 'translate-x-0' : '-translate-x-full'
                   }`}
                 ></div>
+              </div>
+            </div>
+          </div>
+          
+          {/* How it works section */}
+          <div className="mt-4 p-4 bg-cyber-darker/50 border border-cyber-dark rounded-md">
+            <h3 className="text-sm font-medium text-cyber-blue mb-2">How URL Encoding Works:</h3>
+            <p className="text-xs text-gray-300">
+              URL encoding replaces unsafe ASCII characters with a "%" followed by two hexadecimal digits. 
+              For example, space is encoded as %20. This encoding is used for query parameters and other 
+              parts of URLs that may contain special characters.
+            </p>
+            <div className="mt-2 text-xs text-gray-400">
+              <div><strong>Common encodings:</strong></div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                <div>Space → %20</div>
+                <div>! → %21</div>
+                <div># → %23</div>
+                <div>$ → %24</div>
+                <div>% → %25</div>
+                <div>& → %26</div>
+                <div>= → %3D</div>
+                <div>? → %3F</div>
               </div>
             </div>
           </div>

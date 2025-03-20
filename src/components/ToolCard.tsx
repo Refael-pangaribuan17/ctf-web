@@ -10,7 +10,8 @@ export interface ToolCardProps {
   icon: LucideIcon;
   onClick: () => void;
   delayIndex?: number;
-  className?: string; // Add className prop
+  className?: string;
+  isActive?: boolean;
 }
 
 const ToolCard: React.FC<ToolCardProps> = ({ 
@@ -19,12 +20,14 @@ const ToolCard: React.FC<ToolCardProps> = ({
   icon: Icon, 
   onClick, 
   delayIndex = 0,
-  className
+  className,
+  isActive = false
 }) => {
   return (
     <motion.div
       className={cn(
-        "cyber-panel cursor-pointer hover:border-cyber-blue/50 transition-all duration-300 h-full",
+        "cyber-panel cursor-pointer transition-all duration-300 h-full",
+        isActive ? "border-cyber-blue border-2" : "hover:border-cyber-blue/50",
         className
       )}
       onClick={onClick}
@@ -45,14 +48,17 @@ const ToolCard: React.FC<ToolCardProps> = ({
     >
       <div className="p-5 h-full flex flex-col">
         <div className="mb-3 flex items-center">
-          <div className="bg-cyber-blue/20 p-2 rounded-md mr-3">
-            <Icon className="h-6 w-6 text-cyber-blue" />
+          <div className={cn(
+            "p-2 rounded-md mr-3",
+            isActive ? "bg-cyber-blue/40" : "bg-cyber-blue/20"
+          )}>
+            <Icon className={cn("h-6 w-6", isActive ? "text-white" : "text-cyber-blue")} />
           </div>
           <h3 className="text-lg font-bold">{title}</h3>
         </div>
         <p className="text-sm text-gray-400 flex-grow">{description}</p>
         <div className="mt-4 text-xs text-cyber-blue flex items-center justify-end">
-          <span>Open Tool</span>
+          <span>{isActive ? "Selected Tool" : "Open Tool"}</span>
           <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
