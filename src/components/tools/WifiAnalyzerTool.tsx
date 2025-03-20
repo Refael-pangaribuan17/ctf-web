@@ -4,174 +4,201 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { RotateCcw, Upload, Wifi, Download, Play, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Wifi, Play, Search, FileSearch, Download } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { Textarea } from '@/components/ui/textarea';
+
+type Network = {
+  ssid: string;
+  bssid: string;
+  channel: number;
+  signal: number;
+  security: string;
+  clients: number;
+};
+
+type HandshakeCapture = {
+  id: string;
+  ssid: string;
+  bssid: string;
+  timestamp: string;
+  status: 'captured' | 'analyzing' | 'cracked';
+  password?: string;
+};
 
 const WifiAnalyzerTool: React.FC = () => {
-  const [file, setFile] = useState<File | null>(null);
-  const [bssid, setBssid] = useState('');
-  const [essid, setEssid] = useState('');
-  const [channel, setChannel] = useState('');
-  const [captures, setCaptures] = useState(0);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [result, setResult] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [networks, setNetworks] = useState<Network[]>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<Network | null>(null);
+  const [captures, setCaptures] = useState<HandshakeCapture[]>([]);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureProgress, setCaptureProgress] = useState(0);
+  const [dictionaryFile, setDictionaryFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (!selectedFile) return;
+  const handleScan = () => {
+    setIsScanning(true);
+    setNetworks([]);
     
-    if (!selectedFile.name.endsWith('.cap') && !selectedFile.name.endsWith('.pcap')) {
-      toast({
-        title: "Invalid file format",
-        description: "Please upload a .cap or .pcap file",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setFile(selectedFile);
-    setResult(null);
-    
-    // Simulate auto-detection of WiFi network details
+    // Simulate network scanning
     setTimeout(() => {
-      setBssid('00:11:22:33:44:55');
-      setEssid('CaptureTheFlag');
-      setChannel('6');
-      setCaptures(142);
+      const fakeNetworks: Network[] = [
+        {
+          ssid: "HomeNetwork",
+          bssid: "00:11:22:33:44:55",
+          channel: 6,
+          signal: -45,
+          security: "WPA2",
+          clients: 3
+        },
+        {
+          ssid: "Office_WiFi",
+          bssid: "AA:BB:CC:DD:EE:FF",
+          channel: 11,
+          signal: -60,
+          security: "WPA2-Enterprise",
+          clients: 8
+        },
+        {
+          ssid: "GuestNetwork",
+          bssid: "12:34:56:78:90:AB",
+          channel: 1,
+          signal: -70,
+          security: "WPA2",
+          clients: 1
+        },
+        {
+          ssid: "CoffeeShop",
+          bssid: "98:76:54:32:10:FE",
+          channel: 3,
+          signal: -55,
+          security: "WPA2",
+          clients: 5
+        },
+        {
+          ssid: "PublicWiFi",
+          bssid: "FE:DC:BA:98:76:54",
+          channel: 9,
+          signal: -75,
+          security: "Open",
+          clients: 12
+        }
+      ];
+      
+      setNetworks(fakeNetworks);
+      setIsScanning(false);
       
       toast({
-        title: "File loaded",
-        description: `Successfully loaded ${selectedFile.name} (${Math.round(selectedFile.size/1024)} KB)`,
+        title: "Scan Complete",
+        description: `Found ${fakeNetworks.length} networks in range.`,
+      });
+    }, 3000);
+  };
+
+  const handleCapture = () => {
+    if (!selectedNetwork) return;
+    
+    setIsCapturing(true);
+    setCaptureProgress(0);
+    
+    // Simulate handshake capture with progress updates
+    const interval = setInterval(() => {
+      setCaptureProgress(prev => {
+        const newProgress = prev + 10;
+        if (newProgress >= 100) {
+          clearInterval(interval);
+          
+          // Add the captured handshake to the list
+          const newCapture: HandshakeCapture = {
+            id: Date.now().toString(),
+            ssid: selectedNetwork.ssid,
+            bssid: selectedNetwork.bssid,
+            timestamp: new Date().toLocaleString(),
+            status: 'captured'
+          };
+          
+          setCaptures(prev => [...prev, newCapture]);
+          setIsCapturing(false);
+          
+          toast({
+            title: "Handshake Captured",
+            description: `Successfully captured handshake for ${selectedNetwork.ssid}.`,
+          });
+          
+          return 100;
+        }
+        return newProgress;
       });
     }, 500);
   };
 
-  const handleAnalyze = () => {
-    if (!file) {
+  const handleAnalyze = (capture: HandshakeCapture) => {
+    if (isAnalyzing) return;
+    
+    if (!dictionaryFile) {
       toast({
-        title: "No file",
-        description: "Please upload a capture file first",
-        variant: "destructive"
+        title: "Dictionary Required",
+        description: "Please upload a dictionary file for password cracking.",
+        variant: "destructive",
       });
       return;
     }
     
-    setIsProcessing(true);
+    setIsAnalyzing(true);
     
-    // Simulate analysis process
+    // Update status to analyzing
+    setCaptures(prev => prev.map(c => 
+      c.id === capture.id ? { ...c, status: 'analyzing' } : c
+    ));
+    
+    // Simulate password cracking
     setTimeout(() => {
-      const analysisResults = [
-        "=== WiFi Capture Analysis ===",
-        `File: ${file.name}`,
-        `Size: ${Math.round(file.size/1024)} KB`,
-        `BSSID: ${bssid}`,
-        `ESSID: ${essid}`,
-        `Channel: ${channel}`,
-        `Packets captured: ${captures}`,
-        "------------------------",
-        "WPA Handshake: ✓ FOUND",
-        "WPA Key Version: v1",
-        "Key Exchange Messages: 4/4 (Complete)",
-        "Client MAC: A4:B5:C6:D7:E8:F9",
-        "------------------------",
-        "Handshake Quality: Strong",
-        "Estimated cracking difficulty: Medium",
-        "Recommended approach: Dictionary attack with rules"
-      ];
+      // 50% chance of success for demonstration
+      const success = Math.random() > 0.5;
       
-      setResult(analysisResults.join("\n"));
-      setIsProcessing(false);
-      
-      toast({
-        title: "Analysis complete",
-        description: "Handshake captured in file is valid and can be used for password recovery",
-      });
-    }, 2000);
-  };
-
-  const handleCrack = () => {
-    if (!file) {
-      toast({
-        title: "No file",
-        description: "Please upload a capture file first",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (!result || !result.includes("FOUND")) {
-      toast({
-        title: "No handshake",
-        description: "No valid handshake found in the capture file",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsProcessing(true);
-    
-    // Simulate cracking process
-    const totalTime = 5000;
-    const interval = 200;
-    let progress = 0;
-    
-    const crackingInterval = setInterval(() => {
-      progress += interval;
-      
-      if (progress >= totalTime) {
-        clearInterval(crackingInterval);
-        setIsProcessing(false);
+      if (success) {
+        const commonPasswords = ["password123", "admin123", "letmein", "wifi123", "12345678"];
+        const password = commonPasswords[Math.floor(Math.random() * commonPasswords.length)];
         
-        const crackResults = [
-          "=== Password Recovery Results ===",
-          `BSSID: ${bssid}`,
-          `ESSID: ${essid}`,
-          "------------------------",
-          "✓ PASSWORD FOUND: hacktheplanet",
-          "------------------------",
-          "Method: Dictionary attack",
-          "Attempts: 24,563",
-          "Time: 4.8 seconds",
-          "Speed: ~5,100 passwords/sec"
-        ];
-        
-        setResult(crackResults.join("\n"));
+        setCaptures(prev => prev.map(c => 
+          c.id === capture.id ? { ...c, status: 'cracked', password } : c
+        ));
         
         toast({
-          title: "Password found!",
-          description: "The WiFi password has been successfully recovered",
+          title: "Password Cracked",
+          description: `Password for ${capture.ssid}: ${password}`,
+        });
+      } else {
+        setCaptures(prev => prev.map(c => 
+          c.id === capture.id ? { ...c, status: 'captured' } : c
+        ));
+        
+        toast({
+          title: "Cracking Failed",
+          description: "Could not crack the password with the provided dictionary.",
+          variant: "destructive",
         });
       }
-    }, interval);
+      
+      setIsAnalyzing(false);
+    }, 5000);
   };
 
   const handleReset = () => {
-    setFile(null);
-    setBssid('');
-    setEssid('');
-    setChannel('');
-    setCaptures(0);
-    setResult(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setIsScanning(false);
+    setNetworks([]);
+    setSelectedNetwork(null);
+    setCaptures([]);
+    setIsCapturing(false);
+    setCaptureProgress(0);
+    setDictionaryFile(null);
+    setIsAnalyzing(false);
   };
 
-  const handleSaveResults = () => {
-    if (!result) return;
-    
-    const blob = new Blob([result], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'wifi_analysis_results.txt';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  const getSignalStrengthColor = (signal: number) => {
+    if (signal > -50) return "bg-green-500";
+    if (signal > -70) return "bg-yellow-500";
+    return "bg-red-500";
   };
 
   return (
@@ -191,212 +218,268 @@ const WifiAnalyzerTool: React.FC = () => {
           </Button>
         </div>
 
-        <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md flex items-center">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0" />
-          <p className="text-sm text-yellow-200/80">
-            This tool is for educational purposes only. Only analyze WiFi networks you own or have permission to test.
-          </p>
-        </div>
-
-        <Tabs defaultValue="analyze" className="w-full">
+        <Tabs defaultValue="scan" className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-6">
-            <TabsTrigger value="analyze">Analyze Capture</TabsTrigger>
-            <TabsTrigger value="crack">Password Recovery</TabsTrigger>
+            <TabsTrigger value="scan">Network Scanner</TabsTrigger>
+            <TabsTrigger value="handshake">Handshake Analysis</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="analyze" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="capture-file" className="text-sm mb-2 block text-gray-300">
-                  Upload Capture File (.cap/.pcap)
-                </Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    ref={fileInputRef}
-                    id="capture-file"
-                    type="file"
-                    accept=".cap,.pcap"
-                    onChange={handleFileChange}
-                    className="font-mono"
-                  />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
-                  >
-                    <Upload className="h-4 w-4 mr-1" />
-                    Browse
-                  </Button>
-                </div>
-                {file && (
-                  <p className="text-xs text-green-400 mt-1">
-                    {file.name} ({Math.round(file.size/1024)} KB) loaded
-                  </p>
+          <TabsContent value="scan" className="space-y-6">
+            <div className="w-full">
+              <Button
+                onClick={handleScan}
+                disabled={isScanning}
+                className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
+              >
+                {isScanning ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="h-4 w-4 mr-2" />
+                    Scan for Networks
+                  </>
                 )}
-              </div>
+              </Button>
               
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="bssid" className="text-sm mb-2 block text-gray-300">
-                    BSSID (MAC)
-                  </Label>
-                  <Input
-                    id="bssid"
-                    value={bssid}
-                    onChange={(e) => setBssid(e.target.value)}
-                    placeholder="00:11:22:33:44:55"
-                    className="font-mono"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="essid" className="text-sm mb-2 block text-gray-300">
-                    ESSID (Name)
-                  </Label>
-                  <Input
-                    id="essid"
-                    value={essid}
-                    onChange={(e) => setEssid(e.target.value)}
-                    placeholder="Network name"
-                    className="font-mono"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="channel" className="text-sm mb-2 block text-gray-300">
-                    Channel
-                  </Label>
-                  <Input
-                    id="channel"
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value)}
-                    placeholder="1-14"
-                    className="font-mono"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="captures" className="text-sm mb-2 block text-gray-300">
-                    Packets
-                  </Label>
-                  <Input
-                    id="captures"
-                    value={captures || ''}
-                    onChange={(e) => setCaptures(parseInt(e.target.value) || 0)}
-                    placeholder="0"
-                    className="font-mono"
-                  />
-                </div>
-              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                This will scan for nearby WiFi networks in monitor mode (simulation only).
+              </p>
             </div>
             
-            <Button
-              onClick={handleAnalyze}
-              disabled={!file || isProcessing}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isProcessing ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              {isProcessing ? "Analyzing..." : "Analyze Capture"}
-            </Button>
-            
-            {result && (
+            {networks.length > 0 && (
               <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Analysis Results
-                  </Label>
-                  <Button
-                    onClick={handleSaveResults}
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                  >
-                    <Download className="mr-1 h-3 w-3" />
-                    Save
-                  </Button>
+                <Label className="text-sm mb-2 block text-gray-300">
+                  Detected Networks
+                </Label>
+                <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-cyber-dark/50">
+                        <th className="px-4 py-2 text-left">SSID</th>
+                        <th className="px-4 py-2 text-left">BSSID</th>
+                        <th className="px-4 py-2 text-center">CH</th>
+                        <th className="px-4 py-2 text-center">Signal</th>
+                        <th className="px-4 py-2 text-left">Security</th>
+                        <th className="px-4 py-2 text-center">Clients</th>
+                        <th className="px-4 py-2 text-center">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {networks.map((network, index) => (
+                        <tr 
+                          key={network.bssid} 
+                          className={`border-t border-cyber-dark/50 ${
+                            selectedNetwork?.bssid === network.bssid ? 'bg-cyber-blue/10' : ''
+                          } hover:bg-cyber-dark/30 cursor-pointer`}
+                          onClick={() => setSelectedNetwork(network)}
+                        >
+                          <td className="px-4 py-2">{network.ssid}</td>
+                          <td className="px-4 py-2 font-mono text-xs">{network.bssid}</td>
+                          <td className="px-4 py-2 text-center">{network.channel}</td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center justify-center">
+                              <div className="w-16 bg-gray-700 rounded-full h-1.5 mr-2">
+                                <div 
+                                  className={`h-1.5 rounded-full ${getSignalStrengthColor(network.signal)}`} 
+                                  style={{ width: `${Math.min(100, (100 + network.signal) * 1.5)}%` }}
+                                ></div>
+                              </div>
+                              <span className="text-xs">{network.signal} dBm</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">{network.security}</td>
+                          <td className="px-4 py-2 text-center">{network.clients}</td>
+                          <td className="px-4 py-2 text-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 px-2 text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedNetwork(network);
+                              }}
+                            >
+                              Select
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="font-mono text-sm bg-cyber-darker border border-cyber-dark p-4 rounded-md whitespace-pre-line">
-                  {result}
+              </div>
+            )}
+            
+            {selectedNetwork && (
+              <div className="w-full">
+                <Label className="text-sm mb-2 block text-gray-300">
+                  Selected Network
+                </Label>
+                <div className="bg-cyber-darker border border-cyber-dark p-4 rounded-md">
+                  <div className="flex justify-between items-center mb-4">
+                    <div>
+                      <h3 className="font-medium text-lg">{selectedNetwork.ssid}</h3>
+                      <p className="text-xs text-gray-400 font-mono mt-1">{selectedNetwork.bssid}</p>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-sm">{selectedNetwork.security}</div>
+                      <div className="text-xs text-gray-400 mt-1">Channel {selectedNetwork.channel}</div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <Button
+                      onClick={handleCapture}
+                      disabled={isCapturing}
+                      className="bg-cyber-blue hover:bg-cyber-blue/80"
+                    >
+                      {isCapturing ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                          Capturing...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 mr-2" />
+                          Capture Handshake
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setSelectedNetwork(null)}
+                    >
+                      Deselect Network
+                    </Button>
+                  </div>
+                  
+                  {isCapturing && (
+                    <div className="mt-4">
+                      <div className="text-xs text-gray-400 mb-1">Capturing handshake: {captureProgress}%</div>
+                      <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                          className="h-2 rounded-full bg-cyber-blue" 
+                          style={{ width: `${captureProgress}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Waiting for clients to connect/reconnect to capture authentication handshake...
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
           </TabsContent>
           
-          <TabsContent value="crack" className="space-y-6">
+          <TabsContent value="handshake" className="space-y-6">
             <div className="w-full">
               <Label htmlFor="dictionary" className="text-sm mb-2 block text-gray-300">
-                Dictionary File (Optional)
+                Upload Dictionary File
               </Label>
-              <div className="flex items-center gap-2">
+              <div className="flex gap-2">
                 <Input
                   id="dictionary"
                   type="file"
-                  accept=".txt,.dict"
-                  className="font-mono"
+                  onChange={(e) => setDictionaryFile(e.target.files?.[0] || null)}
+                  className="flex-1"
                 />
-                <Button
-                  variant="outline"
-                >
-                  <Upload className="h-4 w-4 mr-1" />
-                  Browse
-                </Button>
+                {dictionaryFile && (
+                  <Button variant="outline" size="sm" onClick={() => setDictionaryFile(null)}>
+                    Clear
+                  </Button>
+                )}
               </div>
               <p className="text-xs text-gray-400 mt-1">
-                For dictionary attacks, upload a wordlist. Leave empty to use default wordlist.
+                Upload a wordlist file for password cracking (e.g., rockyou.txt)
               </p>
             </div>
             
-            <div className="w-full">
-              <Label htmlFor="options" className="text-sm mb-2 block text-gray-300">
-                Additional Options
-              </Label>
-              <Textarea
-                id="options"
-                placeholder="-r rules/best64.rule
---force
---workload=4"
-                className="font-mono resize-y min-h-[100px]"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Optional: Enter advanced recovery options, one per line
-              </p>
-            </div>
-            
-            <Button
-              onClick={handleCrack}
-              disabled={!file || isProcessing || !result || !result.includes("FOUND")}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isProcessing ? (
-                <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              {isProcessing ? "Recovering..." : "Start Password Recovery"}
-            </Button>
-            
-            {result && result.includes("PASSWORD FOUND") && (
+            {captures.length > 0 ? (
               <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Recovery Results
-                  </Label>
-                  <Button
-                    onClick={handleSaveResults}
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                  >
-                    <Download className="mr-1 h-3 w-3" />
-                    Save
-                  </Button>
+                <Label className="text-sm mb-2 block text-gray-300">
+                  Captured Handshakes
+                </Label>
+                <div className="space-y-3">
+                  {captures.map((capture) => (
+                    <div 
+                      key={capture.id} 
+                      className="bg-cyber-darker border border-cyber-dark rounded-md p-4"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <h3 className="font-medium">{capture.ssid}</h3>
+                          <p className="text-xs text-gray-400 font-mono mt-1">{capture.bssid}</p>
+                          <p className="text-xs text-gray-400 mt-1">Captured: {capture.timestamp}</p>
+                        </div>
+                        <div>
+                          <div className={`px-2 py-1 rounded text-xs ${
+                            capture.status === 'cracked' 
+                              ? 'bg-green-900/30 text-green-400 border border-green-500/50' 
+                              : capture.status === 'analyzing'
+                                ? 'bg-yellow-900/30 text-yellow-400 border border-yellow-500/50'
+                                : 'bg-gray-900/30 text-gray-400 border border-gray-500/50'
+                          }`}>
+                            {capture.status === 'cracked' 
+                              ? 'Cracked' 
+                              : capture.status === 'analyzing'
+                                ? 'Analyzing...'
+                                : 'Captured'}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {capture.status === 'cracked' && capture.password && (
+                        <div className="mt-3 p-2 bg-green-900/20 border border-green-500/30 rounded">
+                          <div className="text-xs text-gray-300">Password:</div>
+                          <div className="font-mono text-green-400 mt-1">{capture.password}</div>
+                        </div>
+                      )}
+                      
+                      <div className="flex gap-2 mt-4">
+                        <Button
+                          onClick={() => handleAnalyze(capture)}
+                          disabled={!dictionaryFile || capture.status === 'analyzing' || capture.status === 'cracked' || isAnalyzing}
+                          className={`flex-1 ${capture.status === 'cracked' ? 'bg-gray-600 hover:bg-gray-700' : 'bg-cyber-blue hover:bg-cyber-blue/80'}`}
+                        >
+                          {capture.status === 'analyzing' ? (
+                            <>
+                              <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                              Analyzing...
+                            </>
+                          ) : capture.status === 'cracked' ? (
+                            <>
+                              <FileSearch className="h-4 w-4 mr-2" />
+                              Already Cracked
+                            </>
+                          ) : (
+                            <>
+                              <FileSearch className="h-4 w-4 mr-2" />
+                              Crack Password
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button variant="outline">
+                          <Download className="h-4 w-4 mr-2" />
+                          Save
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <div className="font-mono text-sm bg-cyber-darker border border-green-500/30 p-4 rounded-md whitespace-pre-line">
-                  {result}
-                </div>
+              </div>
+            ) : (
+              <div className="w-full p-8 bg-cyber-darker border border-cyber-dark rounded-md text-center">
+                <Wifi className="h-12 w-12 mx-auto text-gray-600 mb-3" />
+                <h3 className="text-lg font-medium text-gray-400">No Handshakes Captured</h3>
+                <p className="text-sm text-gray-500 mt-2">
+                  Go to the Network Scanner tab to scan for networks and capture handshakes.
+                </p>
               </div>
             )}
           </TabsContent>

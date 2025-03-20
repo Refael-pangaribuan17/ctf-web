@@ -4,301 +4,206 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
+import { RotateCcw, Search, Server, Database, Globe, Copy } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
-import { Search, RotateCcw, ExternalLink, Download, Globe, Copy, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ReconTool: React.FC = () => {
-  const [domain, setDomain] = useState('');
-  const [ipAddress, setIpAddress] = useState('');
-  const [isScanning, setIsScanning] = useState(false);
-  const [dnsResults, setDnsResults] = useState<string | null>(null);
-  const [whoisResults, setWhoisResults] = useState<string | null>(null);
-  const [portScanResults, setPortScanResults] = useState<string | null>(null);
-  const [targetType, setTargetType] = useState<'domain' | 'ip'>('domain');
-  const [portRanges, setPortRanges] = useState({
-    common: true,
-    http: true,
-    mail: true,
-    database: true,
-    custom: false
-  });
-  const [customPorts, setCustomPorts] = useState('');
+  const [target, setTarget] = useState('');
+  const [dnsRecords, setDnsRecords] = useState<Array<{ type: string; value: string }>>([]);
+  const [whoisData, setWhoisData] = useState<Record<string, string> | null>(null);
+  const [ports, setPorts] = useState<Array<{ port: number; service: string; state: string }>>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [commonPorts, setCommonPorts] = useState(true);
+  const [fullScan, setFullScan] = useState(false);
   const { toast } = useToast();
 
-  const handleReset = () => {
-    setDomain('');
-    setIpAddress('');
-    setDnsResults(null);
-    setWhoisResults(null);
-    setPortScanResults(null);
-    setPortRanges({
-      common: true,
-      http: true,
-      mail: true,
-      database: true,
-      custom: false
-    });
-    setCustomPorts('');
-  };
+  const handleDnsLookup = () => {
+    if (!validateTarget()) return;
 
-  const handleCopy = (text: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: "Copied to clipboard",
-      description: "Content copied to clipboard",
-    });
-  };
+    setIsLoading(true);
+    setDnsRecords([]);
 
-  const handleSaveResults = (content: string, filename: string) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
-  const simulateDnsScan = () => {
-    const target = targetType === 'domain' ? domain : ipAddress;
-    
-    if (!target) {
-      toast({
-        title: "Target required",
-        description: `Please enter a ${targetType === 'domain' ? 'domain' : 'IP address'}`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsScanning(true);
-    setDnsResults(null);
-    
+    // Simulate DNS lookup
     setTimeout(() => {
-      let results = '';
-      
-      if (targetType === 'domain') {
-        // Generate fake DNS records for the domain
-        results = `# DNS Records for ${domain}
+      const domain = extractDomain(target);
+      const fakeDnsRecords = [
+        { type: 'A', value: '192.168.1.1' },
+        { type: 'AAAA', value: '2001:0db8:85a3:0000:0000:8a2e:0370:7334' },
+        { type: 'MX', value: `mail.${domain} (priority: 10)` },
+        { type: 'NS', value: `ns1.${domain}` },
+        { type: 'NS', value: `ns2.${domain}` },
+        { type: 'CNAME', value: `www.${domain} -> ${domain}` },
+        { type: 'TXT', value: 'v=spf1 include:_spf.google.com ~all' },
+        { type: 'SOA', value: `ns1.${domain} admin.${domain} 2023011301 3600 1800 604800 86400` }
+      ];
 
-;; QUESTION SECTION:
-;${domain}.			IN	ANY
+      setDnsRecords(fakeDnsRecords);
+      setIsLoading(false);
 
-;; ANSWER SECTION:
-${domain}.		3600	IN	A	203.0.113.${Math.floor(Math.random() * 255)}
-${domain}.		3600	IN	MX	10 mail.${domain}.
-${domain}.		3600	IN	NS	ns1.${domain}.
-${domain}.		3600	IN	NS	ns2.${domain}.
-${domain}.		3600	IN	TXT	"v=spf1 include:_spf.${domain} ~all"
-${domain}.		3600	IN	SOA	ns1.${domain}. hostmaster.${domain}. 2023031301 10800 3600 604800 86400
-
-;; ADDITIONAL SECTION:
-mail.${domain}.	3600	IN	A	203.0.113.${Math.floor(Math.random() * 255)}
-ns1.${domain}.		3600	IN	A	203.0.113.${Math.floor(Math.random() * 255)}
-ns2.${domain}.		3600	IN	A	203.0.113.${Math.floor(Math.random() * 255)}
-www.${domain}.		3600	IN	CNAME	${domain}.
-blog.${domain}.	3600	IN	CNAME	${domain}.`;
-      } else {
-        // Generate fake reverse DNS for the IP
-        const ipParts = ipAddress.split('.');
-        const fakeDomain = `host-${ipParts.join('-')}.example.com`;
-        
-        results = `# Reverse DNS Lookup for ${ipAddress}
-
-;; QUESTION SECTION:
-;${ipAddress.split('.').reverse().join('.')}.in-addr.arpa.	IN	PTR
-
-;; ANSWER SECTION:
-${ipAddress.split('.').reverse().join('.')}.in-addr.arpa. 86400 IN PTR ${fakeDomain}.
-
-;; AUTHORITY SECTION:
-in-addr.arpa.		86400	IN	NS	a.in-addr-servers.arpa.
-in-addr.arpa.		86400	IN	NS	b.in-addr-servers.arpa.`;
-      }
-      
-      setDnsResults(results);
-      setIsScanning(false);
-      
       toast({
-        title: "DNS lookup complete",
-        description: `Found ${targetType === 'domain' ? '8' : '1'} DNS records`,
-      });
-    }, 1500);
-  };
-
-  const simulateWhoisLookup = () => {
-    const target = targetType === 'domain' ? domain : ipAddress;
-    
-    if (!target) {
-      toast({
-        title: "Target required",
-        description: `Please enter a ${targetType === 'domain' ? 'domain' : 'IP address'}`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsScanning(true);
-    setWhoisResults(null);
-    
-    setTimeout(() => {
-      let results = '';
-      
-      if (targetType === 'domain') {
-        // Generate fake WHOIS data for the domain
-        const randomDate = new Date();
-        randomDate.setFullYear(randomDate.getFullYear() - Math.floor(Math.random() * 10));
-        const expiryDate = new Date();
-        expiryDate.setFullYear(expiryDate.getFullYear() + Math.floor(Math.random() * 5) + 1);
-        
-        results = `Domain Name: ${domain.toUpperCase()}
-Registry Domain ID: ${Math.random().toString(36).substring(2, 15)}_DOMAIN
-Registrar WHOIS Server: whois.example-registrar.com
-Registrar URL: http://www.example-registrar.com
-Updated Date: ${new Date().toISOString().split('T')[0]}
-Creation Date: ${randomDate.toISOString().split('T')[0]}
-Registry Expiry Date: ${expiryDate.toISOString().split('T')[0]}
-Registrar: Example Registrar, Inc.
-Registrar IANA ID: 1234567
-Registrar Abuse Contact Email: abuse@example-registrar.com
-Registrar Abuse Contact Phone: +1.5555555555
-Domain Status: clientTransferProhibited https://icann.org/epp#clientTransferProhibited
-Name Server: NS1.${domain}
-Name Server: NS2.${domain}
-DNSSEC: unsigned
-URL of the ICANN Whois Inaccuracy Complaint Form: https://www.icann.org/wicf/
-
->>> Last update of WHOIS database: ${new Date().toISOString().split('T')[0]} <<<`;
-      } else {
-        // Generate fake WHOIS data for the IP
-        results = `% Information related to '${ipAddress}/24'
-
-% Abuse contact for '${ipAddress}/24' is 'abuse@example.net'
-
-inetnum:        ${ipAddress}/24
-netname:        EXAMPLE-NET
-descr:          Example ISP Network
-country:        US
-admin-c:        EX123-RIPE
-tech-c:         EX123-RIPE
-status:         ALLOCATED PA
-mnt-by:         EXAMPLEISP-MNT
-created:        2018-01-01T00:00:00Z
-last-modified:  2023-01-01T00:00:00Z
-source:         RIPE
-
-organisation:   ORG-EISP1-RIPE
-org-name:       Example ISP Inc.
-org-type:       LIR
-address:        123 Main Street
-address:        Anytown, CA 12345
-address:        United States
-phone:          +1 555 123 4567
-abuse-c:        EXAB-RIPE
-mnt-ref:        EXAMPLEISP-MNT
-mnt-by:         EXAMPLEISP-MNT
-created:        2010-01-01T00:00:00Z
-last-modified:  2022-01-01T00:00:00Z
-source:         RIPE`;
-      }
-      
-      setWhoisResults(results);
-      setIsScanning(false);
-      
-      toast({
-        title: "WHOIS lookup complete",
-        description: "Registry information retrieved",
+        title: "DNS Lookup Complete",
+        description: `Found ${fakeDnsRecords.length} DNS records for ${domain}.`,
       });
     }, 2000);
   };
 
-  const simulatePortScan = () => {
-    const target = targetType === 'domain' ? domain : ipAddress;
-    
-    if (!target) {
-      toast({
-        title: "Target required",
-        description: `Please enter a ${targetType === 'domain' ? 'domain' : 'IP address'}`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setIsScanning(true);
-    setPortScanResults(null);
-    
+  const handleWhoisLookup = () => {
+    if (!validateTarget()) return;
+
+    setIsLoading(true);
+    setWhoisData(null);
+
+    // Simulate WHOIS lookup
     setTimeout(() => {
-      const openPorts: { port: number; service: string; state: string; version?: string }[] = [];
-      
-      // Add common ports if selected
-      if (portRanges.common) {
-        openPorts.push(
-          { port: 22, service: 'ssh', state: 'open', version: 'OpenSSH 8.2p1' },
-          { port: 53, service: 'domain', state: 'open', version: 'ISC BIND 9.16.1' }
-        );
-      }
-      
-      // Add HTTP ports if selected
-      if (portRanges.http) {
-        openPorts.push(
-          { port: 80, service: 'http', state: 'open', version: 'Apache httpd 2.4.41' },
-          { port: 443, service: 'https', state: 'open', version: 'Apache httpd 2.4.41' }
-        );
-      }
-      
-      // Add mail ports if selected
-      if (portRanges.mail) {
-        openPorts.push(
-          { port: 25, service: 'smtp', state: 'filtered' },
-          { port: 143, service: 'imap', state: 'open', version: 'Dovecot imapd' },
-          { port: 587, service: 'submission', state: 'open', version: 'Postfix smtpd' }
-        );
-      }
-      
-      // Add database ports if selected
-      if (portRanges.database) {
-        openPorts.push(
-          { port: 3306, service: 'mysql', state: 'open', version: 'MySQL 8.0.27' },
-          { port: 5432, service: 'postgresql', state: Math.random() > 0.5 ? 'open' : 'filtered', version: 'PostgreSQL 13.4' }
-        );
-      }
-      
-      // Add custom ports if selected
-      if (portRanges.custom && customPorts.trim()) {
-        const ports = customPorts.split(',').map(p => parseInt(p.trim())).filter(p => !isNaN(p));
-        ports.forEach(port => {
-          if (!openPorts.some(p => p.port === port)) {
-            if (Math.random() > 0.7) {
-              openPorts.push({ port, service: 'unknown', state: 'open' });
-            }
-          }
-        });
-      }
-      
-      // Sort ports by number
-      openPorts.sort((a, b) => a.port - b.port);
-      
-      const results = `# Nmap scan report for ${target} (${targetType === 'domain' ? '203.0.113.' + Math.floor(Math.random() * 255) : ipAddress})
-# Scan initiated ${new Date().toLocaleString()}
-# PORT    STATE    SERVICE    VERSION
-${openPorts.map(p => 
-  `${p.port.toString().padEnd(8)}${p.state.padEnd(10)}${p.service.padEnd(12)}${p.version || ''}`
-).join('\n')}
+      const domain = extractDomain(target);
+      const fakeWhoisData = {
+        "Domain Name": domain,
+        "Registry Domain ID": `${Math.random().toString(36).substring(2, 15)}_DOMAIN_COM-VRSN`,
+        "Registrar WHOIS Server": "whois.registrar.com",
+        "Registrar URL": "http://www.registrar.com",
+        "Updated Date": "2022-09-15T08:30:45Z",
+        "Creation Date": "2001-03-22T13:45:07Z",
+        "Registrar": "Example Registrar, LLC",
+        "Registrar IANA ID": "1234567",
+        "Registrar Abuse Contact Email": `abuse@${domain}`,
+        "Registrar Abuse Contact Phone": "+1.5555555555",
+        "Domain Status": "clientTransferProhibited",
+        "Registry Registrant ID": "RT_${Math.random().toString(36).substring(2, 8)}",
+        "Registrant Name": "Domain Administrator",
+        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} CORPORATION`,
+        "Registrant Street": "123 Example St",
+        "Registrant City": "Anytown",
+        "Registrant State/Province": "CA",
+        "Registrant Postal Code": "94105",
+        "Registrant Country": "US",
+        "Registrant Phone": "+1.5555555555",
+        "Registrant Email": `admin@${domain}`,
+        "Name Server": `ns1.${domain}`,
+        "Name Server": `ns2.${domain}`,
+        "DNSSEC": "unsigned"
+      };
 
-# Scan completed in ${(Math.random() * 10 + 5).toFixed(2)} seconds
-# Found ${openPorts.length} open ports out of ${portRanges.custom ? customPorts.split(',').length : ''} scanned`;
+      setWhoisData(fakeWhoisData);
+      setIsLoading(false);
 
-      setPortScanResults(results);
-      setIsScanning(false);
-      
       toast({
-        title: "Port scan complete",
-        description: `Found ${openPorts.filter(p => p.state === 'open').length} open ports`,
+        title: "WHOIS Lookup Complete",
+        description: `Retrieved WHOIS information for ${domain}.`,
+      });
+    }, 2500);
+  };
+
+  const handlePortScan = () => {
+    if (!validateTarget()) return;
+
+    setIsLoading(true);
+    setPorts([]);
+
+    // Simulate port scanning
+    setTimeout(() => {
+      const commonPortList = [
+        { port: 21, service: "FTP", state: Math.random() > 0.7 ? "open" : "closed" },
+        { port: 22, service: "SSH", state: Math.random() > 0.5 ? "open" : "closed" },
+        { port: 23, service: "Telnet", state: Math.random() > 0.8 ? "open" : "closed" },
+        { port: 25, service: "SMTP", state: Math.random() > 0.7 ? "open" : "closed" },
+        { port: 53, service: "DNS", state: Math.random() > 0.6 ? "open" : "closed" },
+        { port: 80, service: "HTTP", state: "open" },
+        { port: 110, service: "POP3", state: Math.random() > 0.8 ? "open" : "closed" },
+        { port: 143, service: "IMAP", state: Math.random() > 0.8 ? "open" : "closed" },
+        { port: 443, service: "HTTPS", state: "open" },
+        { port: 445, service: "SMB", state: Math.random() > 0.7 ? "open" : "closed" },
+        { port: 3306, service: "MySQL", state: Math.random() > 0.7 ? "open" : "closed" },
+        { port: 3389, service: "RDP", state: Math.random() > 0.8 ? "open" : "closed" }
+      ];
+
+      // Add some random additional ports if full scan is selected
+      const additionalPorts = fullScan
+        ? [
+            { port: 1433, service: "MSSQL", state: Math.random() > 0.8 ? "open" : "closed" },
+            { port: 1521, service: "Oracle", state: Math.random() > 0.8 ? "open" : "closed" },
+            { port: 5432, service: "PostgreSQL", state: Math.random() > 0.8 ? "open" : "closed" },
+            { port: 8080, service: "HTTP-Proxy", state: Math.random() > 0.6 ? "open" : "closed" },
+            { port: 8443, service: "HTTPS-Alt", state: Math.random() > 0.7 ? "open" : "closed" },
+            { port: 27017, service: "MongoDB", state: Math.random() > 0.8 ? "open" : "closed" }
+          ]
+        : [];
+
+      const selectedPorts = commonPorts 
+        ? [...commonPortList, ...additionalPorts]
+        : additionalPorts.length > 0 
+          ? additionalPorts
+          : [{ port: 80, service: "HTTP", state: "open" }]; // Ensure at least one port is displayed
+
+      setPorts(selectedPorts);
+      setIsLoading(false);
+
+      const openPorts = selectedPorts.filter(p => p.state === "open").length;
+      toast({
+        title: "Port Scan Complete",
+        description: `Scanned ${selectedPorts.length} ports, found ${openPorts} open ports.`,
       });
     }, 3000);
+  };
+
+  const validateTarget = () => {
+    if (!target) {
+      toast({
+        title: "Target Required",
+        description: "Please enter a target domain or IP address.",
+        variant: "destructive",
+      });
+      return false;
+    }
+    return true;
+  };
+
+  const extractDomain = (url: string) => {
+    // Simple extraction of domain from URL or just return the input if it looks like a domain
+    try {
+      if (url.startsWith('http')) {
+        return new URL(url).hostname;
+      }
+      return url.replace(/^www\./, '');
+    } catch {
+      return url;
+    }
+  };
+
+  const handleReset = () => {
+    setTarget('');
+    setDnsRecords([]);
+    setWhoisData(null);
+    setPorts([]);
+    setCommonPorts(true);
+    setFullScan(false);
+  };
+
+  const handleCopy = (data: any) => {
+    let textToCopy = '';
+    
+    if (Array.isArray(data)) {
+      textToCopy = data.map(item => {
+        if ('type' in item && 'value' in item) {
+          return `${item.type}: ${item.value}`;
+        } else if ('port' in item) {
+          return `${item.port}/tcp ${item.state} ${item.service}`;
+        }
+        return JSON.stringify(item);
+      }).join('\n');
+    } else if (typeof data === 'object' && data !== null) {
+      textToCopy = Object.entries(data)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join('\n');
+    }
+    
+    if (textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
+      toast({
+        title: "Copied to clipboard",
+        description: "The data has been copied to your clipboard.",
+      });
+    }
   };
 
   return (
@@ -306,7 +211,7 @@ ${openPorts.map(p =>
       <div className="cyber-panel p-6">
         <div className="flex items-center mb-6">
           <Search className="mr-2 h-6 w-6 text-cyber-blue" />
-          <h2 className="text-xl font-bold flex-1">Reconnaissance Tools</h2>
+          <h2 className="text-xl font-bold flex-1">Reconnaissance Tool</h2>
           <Button
             variant="outline"
             size="sm"
@@ -318,315 +223,256 @@ ${openPorts.map(p =>
           </Button>
         </div>
 
-        <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md flex items-center">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0" />
-          <p className="text-sm text-yellow-200/80">
-            For educational purposes only. Ensure you have permission before performing reconnaissance on any system or network.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-          <div>
-            <Label className="text-sm mb-2 block text-gray-300">
-              Target Type
-            </Label>
-            <div className="flex space-x-1">
-              <Button
-                variant={targetType === 'domain' ? 'default' : 'outline'}
-                onClick={() => setTargetType('domain')}
-                className={`flex-1 ${targetType === 'domain' ? 'bg-cyber-blue hover:bg-cyber-blue/80' : ''}`}
-              >
-                <Globe className="h-4 w-4 mr-2" />
-                Domain
-              </Button>
-              <Button
-                variant={targetType === 'ip' ? 'default' : 'outline'}
-                onClick={() => setTargetType('ip')}
-                className={`flex-1 ${targetType === 'ip' ? 'bg-cyber-blue hover:bg-cyber-blue/80' : ''}`}
-              >
-                <Search className="h-4 w-4 mr-2" />
-                IP Address
-              </Button>
-            </div>
-          </div>
-          
-          <div>
+        <div className="space-y-6">
+          <div className="w-full">
             <Label htmlFor="target" className="text-sm mb-2 block text-gray-300">
-              {targetType === 'domain' ? 'Domain Name' : 'IP Address'}
+              Target Domain or IP
             </Label>
-            {targetType === 'domain' ? (
-              <Input
-                id="domain"
-                value={domain}
-                onChange={(e) => setDomain(e.target.value)}
-                placeholder="example.com"
-                className="font-mono"
-              />
-            ) : (
-              <Input
-                id="ip-address"
-                value={ipAddress}
-                onChange={(e) => setIpAddress(e.target.value)}
-                placeholder="192.168.1.1"
-                className="font-mono"
-              />
-            )}
+            <Input
+              id="target"
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              placeholder="example.com or 192.168.1.1"
+              className="font-mono"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Enter a domain name or IP address for reconnaissance
+            </p>
           </div>
-        </div>
-
-        <Tabs defaultValue="dns" className="w-full">
-          <TabsList className="w-full grid grid-cols-3 mb-6">
-            <TabsTrigger value="dns">DNS Lookup</TabsTrigger>
-            <TabsTrigger value="whois">WHOIS Lookup</TabsTrigger>
-            <TabsTrigger value="portscan">Port Scanner</TabsTrigger>
-          </TabsList>
           
-          <TabsContent value="dns" className="space-y-6">
-            <div className="p-4 bg-cyber-darker rounded-md">
-              <h3 className="text-sm font-medium mb-2">DNS Lookup Information:</h3>
-              <ul className="text-xs text-gray-300 space-y-1 list-disc pl-4">
-                <li>Retrieves DNS records for a domain (A, MX, NS, TXT, SOA, etc.)</li>
-                <li>Performs reverse DNS lookup for IP addresses</li>
-                <li>Shows authoritative name servers and mail servers</li>
-                <li>Useful for domain reconnaissance and mail server configuration</li>
-              </ul>
-            </div>
+          <Tabs defaultValue="dns" className="w-full">
+            <TabsList className="w-full grid grid-cols-3 mb-6">
+              <TabsTrigger value="dns">DNS Lookup</TabsTrigger>
+              <TabsTrigger value="whois">WHOIS</TabsTrigger>
+              <TabsTrigger value="port">Port Scan</TabsTrigger>
+            </TabsList>
             
-            <Button
-              onClick={simulateDnsScan}
-              disabled={isScanning || !(domain || ipAddress)}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isScanning ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-                  Performing DNS Lookup...
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Perform DNS Lookup
-                </>
-              )}
-            </Button>
-            
-            {dnsResults && (
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    DNS Lookup Results
-                  </Label>
-                  <div className="flex gap-2">
+            <TabsContent value="dns" className="space-y-4">
+              <Button
+                onClick={handleDnsLookup}
+                disabled={isLoading}
+                className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                    Looking up DNS records...
+                  </>
+                ) : (
+                  <>
+                    <Globe className="h-4 w-4 mr-2" />
+                    Lookup DNS Records
+                  </>
+                )}
+              </Button>
+              
+              {dnsRecords.length > 0 && (
+                <div className="w-full">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-sm text-gray-300">
+                      DNS Records
+                    </Label>
                     <Button
-                      onClick={() => handleCopy(dnsResults)}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      onClick={() => handleCopy(dnsRecords)}
                       className="h-6 px-2 text-xs"
                     >
                       <Copy className="mr-1 h-3 w-3" />
                       Copy
                     </Button>
-                    <Button
-                      onClick={() => handleSaveResults(dnsResults, 'dns_lookup_results.txt')}
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Download className="mr-1 h-3 w-3" />
-                      Save
-                    </Button>
+                  </div>
+                  <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-cyber-dark/50">
+                          <th className="px-4 py-2 text-left">Type</th>
+                          <th className="px-4 py-2 text-left">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dnsRecords.map((record, index) => (
+                          <tr 
+                            key={index} 
+                            className="border-t border-cyber-dark/50"
+                          >
+                            <td className="px-4 py-2 font-medium">{record.type}</td>
+                            <td className="px-4 py-2 font-mono text-xs break-all">{record.value}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                <div className="font-mono text-sm bg-cyber-darker border border-cyber-dark p-4 rounded-md whitespace-pre-wrap overflow-x-auto">
-                  {dnsResults}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="whois" className="space-y-6">
-            <div className="p-4 bg-cyber-darker rounded-md">
-              <h3 className="text-sm font-medium mb-2">WHOIS Lookup Information:</h3>
-              <ul className="text-xs text-gray-300 space-y-1 list-disc pl-4">
-                <li>Retrieves registration information for domains and IP addresses</li>
-                <li>Shows registrar, registration dates, nameservers, and contact info</li>
-                <li>For IP addresses, shows network allocation and ASN information</li>
-                <li>Useful for identifying domain ownership and network attribution</li>
-              </ul>
-            </div>
-            
-            <Button
-              onClick={simulateWhoisLookup}
-              disabled={isScanning || !(domain || ipAddress)}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isScanning ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-                  Performing WHOIS Lookup...
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Perform WHOIS Lookup
-                </>
               )}
-            </Button>
+            </TabsContent>
             
-            {whoisResults && (
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    WHOIS Lookup Results
-                  </Label>
-                  <div className="flex gap-2">
+            <TabsContent value="whois" className="space-y-4">
+              <Button
+                onClick={handleWhoisLookup}
+                disabled={isLoading}
+                className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
+              >
+                {isLoading ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                    Looking up WHOIS data...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    Lookup WHOIS Information
+                  </>
+                )}
+              </Button>
+              
+              {whoisData && (
+                <div className="w-full">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-sm text-gray-300">
+                      WHOIS Information
+                    </Label>
                     <Button
-                      onClick={() => handleCopy(whoisResults)}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      onClick={() => handleCopy(whoisData)}
                       className="h-6 px-2 text-xs"
                     >
                       <Copy className="mr-1 h-3 w-3" />
                       Copy
                     </Button>
-                    <Button
-                      onClick={() => handleSaveResults(whoisResults, 'whois_lookup_results.txt')}
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Download className="mr-1 h-3 w-3" />
-                      Save
-                    </Button>
+                  </div>
+                  <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
+                    <div className="p-4 bg-cyber-dark/20 border-b border-cyber-dark">
+                      <h3 className="text-cyber-blue font-medium">{whoisData["Domain Name"]}</h3>
+                    </div>
+                    <div className="p-4">
+                      <table className="w-full text-sm">
+                        <tbody>
+                          {Object.entries(whoisData).map(([key, value], index) => (
+                            <tr 
+                              key={index} 
+                              className={index !== 0 ? "border-t border-cyber-dark/30" : ""}
+                            >
+                              <td className="py-2 pr-4 font-medium text-gray-300 whitespace-nowrap align-top">
+                                {key}
+                              </td>
+                              <td className="py-2 pl-4 font-mono text-xs break-all">
+                                {value}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
-                <div className="font-mono text-sm bg-cyber-darker border border-cyber-dark p-4 rounded-md whitespace-pre-wrap overflow-x-auto">
-                  {whoisResults}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="portscan" className="space-y-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="common-ports" 
-                  checked={portRanges.common}
-                  onCheckedChange={(checked) => 
-                    setPortRanges({...portRanges, common: checked === true})
-                  }
-                />
-                <Label htmlFor="common-ports" className="text-sm cursor-pointer">Common</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="http-ports" 
-                  checked={portRanges.http}
-                  onCheckedChange={(checked) => 
-                    setPortRanges({...portRanges, http: checked === true})
-                  }
-                />
-                <Label htmlFor="http-ports" className="text-sm cursor-pointer">HTTP/S</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="mail-ports" 
-                  checked={portRanges.mail}
-                  onCheckedChange={(checked) => 
-                    setPortRanges({...portRanges, mail: checked === true})
-                  }
-                />
-                <Label htmlFor="mail-ports" className="text-sm cursor-pointer">Mail</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="db-ports" 
-                  checked={portRanges.database}
-                  onCheckedChange={(checked) => 
-                    setPortRanges({...portRanges, database: checked === true})
-                  }
-                />
-                <Label htmlFor="db-ports" className="text-sm cursor-pointer">Database</Label>
-              </div>
-            </div>
+              )}
+            </TabsContent>
             
-            <div className="w-full">
-              <div className="flex items-center space-x-2 mb-2">
-                <Checkbox 
-                  id="custom-ports" 
-                  checked={portRanges.custom}
-                  onCheckedChange={(checked) => 
-                    setPortRanges({...portRanges, custom: checked === true})
-                  }
-                />
-                <Label htmlFor="custom-ports" className="text-sm cursor-pointer">Custom ports</Label>
+            <TabsContent value="port" className="space-y-4">
+              <div className="flex flex-col space-y-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="common-ports" 
+                    checked={commonPorts}
+                    onCheckedChange={(checked) => setCommonPorts(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="common-ports"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Scan common ports (21, 22, 23, 25, 80, 443, etc.)
+                  </label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <Checkbox 
+                    id="full-scan" 
+                    checked={fullScan}
+                    onCheckedChange={(checked) => setFullScan(checked as boolean)}
+                  />
+                  <label
+                    htmlFor="full-scan"
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Include additional ports (1433, 3306, 5432, 8080, etc.)
+                  </label>
+                </div>
+                
+                <Button
+                  onClick={handlePortScan}
+                  disabled={isLoading}
+                  className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                      Scanning ports...
+                    </>
+                  ) : (
+                    <>
+                      <Server className="h-4 w-4 mr-2" />
+                      Scan Ports
+                    </>
+                  )}
+                </Button>
+                
+                <p className="text-xs text-gray-400">
+                  Note: This is a simulated port scan for educational purposes only. No actual scanning is performed.
+                </p>
               </div>
               
-              <Input
-                value={customPorts}
-                onChange={(e) => setCustomPorts(e.target.value)}
-                placeholder="21,23,1433,27017,8080,8443"
-                className="font-mono"
-                disabled={!portRanges.custom}
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Enter comma-separated port numbers to scan
-              </p>
-            </div>
-            
-            <Button
-              onClick={simulatePortScan}
-              disabled={isScanning || !(domain || ipAddress) || Object.values(portRanges).every(v => v === false)}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isScanning ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-                  Scanning Ports...
-                </>
-              ) : (
-                <>
-                  <Search className="h-4 w-4 mr-2" />
-                  Start Port Scan
-                </>
-              )}
-            </Button>
-            
-            {portScanResults && (
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Port Scan Results
-                  </Label>
-                  <div className="flex gap-2">
+              {ports.length > 0 && (
+                <div className="w-full">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-sm text-gray-300">
+                      Port Scan Results
+                    </Label>
                     <Button
-                      onClick={() => handleCopy(portScanResults)}
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
+                      onClick={() => handleCopy(ports)}
                       className="h-6 px-2 text-xs"
                     >
                       <Copy className="mr-1 h-3 w-3" />
                       Copy
                     </Button>
-                    <Button
-                      onClick={() => handleSaveResults(portScanResults, 'port_scan_results.txt')}
-                      variant="outline"
-                      size="sm"
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Download className="mr-1 h-3 w-3" />
-                      Save
-                    </Button>
+                  </div>
+                  <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-cyber-dark/50">
+                          <th className="px-4 py-2 text-left">Port</th>
+                          <th className="px-4 py-2 text-left">Service</th>
+                          <th className="px-4 py-2 text-left">State</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ports.map((port, index) => (
+                          <tr 
+                            key={index} 
+                            className={`border-t border-cyber-dark/50 ${
+                              port.state === 'open' ? 'bg-green-900/10' : ''
+                            }`}
+                          >
+                            <td className="px-4 py-2 font-mono">{port.port}/tcp</td>
+                            <td className="px-4 py-2">{port.service}</td>
+                            <td className={`px-4 py-2 font-medium ${
+                              port.state === 'open' ? 'text-green-400' : 'text-red-400'
+                            }`}>
+                              {port.state}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                <div className="font-mono text-sm bg-cyber-darker border border-cyber-dark p-4 rounded-md whitespace-pre-wrap overflow-x-auto">
-                  {portScanResults}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-        </Tabs>
+              )}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

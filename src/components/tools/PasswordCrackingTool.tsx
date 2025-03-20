@@ -1,153 +1,204 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RotateCcw, KeyRound, Play, FileText, Copy, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/components/ui/use-toast';
-import { KeyRound, Play, Download, RotateCcw, Upload, AlertTriangle } from 'lucide-react';
+
+type HashType = 'md5' | 'sha1' | 'sha256' | 'sha512' | 'ntlm';
 
 const PasswordCrackingTool: React.FC = () => {
-  const [hashType, setHashType] = useState('md5');
-  const [hash, setHash] = useState('');
-  const [customWordlist, setCustomWordlist] = useState<File | null>(null);
-  const [useDefaultWordlist, setUseDefaultWordlist] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [hashValue, setHashValue] = useState('');
+  const [hashType, setHashType] = useState<HashType>('md5');
+  const [crackMethod, setCrackMethod] = useState<'dictionary' | 'bruteforce'>('dictionary');
+  const [dictionaryContent, setDictionaryContent] = useState('');
+  const [bruteforceChars, setBruteforceChars] = useState('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+  const [bruteforceMaxLength, setBruteforceMaxLength] = useState(8);
+  const [isCracking, setIsCracking] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [result, setResult] = useState<string | null>(null);
-  const [attackType, setAttackType] = useState('dictionary');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [result, setResult] = useState<{ password: string; timeTaken: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const commonHashes: Record<string, string> = {
-    md5: '5f4dcc3b5aa765d61d8327deb882cf99', // 'password'
-    sha1: '5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8', // 'password'
-    sha256: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', // 'password'
-    ntlm: '8846F7EAEE8FB117AD06BDD830B7586C' // 'password'
+  // Sample hash values for demonstration
+  const sampleHashes: Record<HashType, { hash: string; password: string }> = {
+    'md5': { 
+      hash: '5f4dcc3b5aa765d61d8327deb882cf99', 
+      password: 'password'
+    },
+    'sha1': { 
+      hash: '5baa61e4c9b93f3f0682250b6cf8331b7ee68fd8', 
+      password: 'password'
+    },
+    'sha256': { 
+      hash: '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8', 
+      password: 'password'
+    },
+    'sha512': { 
+      hash: 'b109f3bbbc244eb82441917ed06d618b9008dd09b3befd1b5e07394c706a8bb980b1d7785e5976ec049b46df5f1326af5a2ea6d103fd07c95385ffab0cacbc86', 
+      password: 'password'
+    },
+    'ntlm': { 
+      hash: '8846f7eaee8fb117ad06bdd830b7586c', 
+      password: 'password'
+    }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+  // Function to load a sample hash
+  const loadSampleHash = () => {
+    setHashValue(sampleHashes[hashType].hash);
+    setError(null);
+    setResult(null);
+  };
+
+  // Function to load a sample dictionary
+  const loadSampleDictionary = () => {
+    const sampleDictionary = `123456
+password
+12345678
+qwerty
+123456789
+12345
+1234
+111111
+1234567
+dragon
+123123
+baseball
+abc123
+football
+monkey
+letmein
+shadow
+master
+666666
+qwertyuiop`;
+    setDictionaryContent(sampleDictionary);
+  };
+
+  const handleStartCracking = () => {
+    if (!hashValue) {
       toast({
-        title: "File too large",
-        description: "Please upload a wordlist smaller than 10MB",
-        variant: "destructive"
+        title: "Missing Hash",
+        description: "Please enter a hash value to crack.",
+        variant: "destructive",
       });
       return;
     }
-    
-    setCustomWordlist(file);
-    setUseDefaultWordlist(false);
-    
-    toast({
-      title: "Wordlist loaded",
-      description: `${file.name} (${(file.size / 1024).toFixed(1)} KB)`
-    });
-  };
 
-  const handleExampleHash = () => {
-    setHash(commonHashes[hashType] || '');
-  };
-
-  const simulateCracking = () => {
-    if (!hash.trim()) {
+    if (crackMethod === 'dictionary' && !dictionaryContent) {
       toast({
-        title: "No hash provided",
-        description: "Please enter a hash to crack",
-        variant: "destructive"
+        title: "Missing Dictionary",
+        description: "Please provide a password dictionary.",
+        variant: "destructive",
       });
       return;
     }
-    
-    setIsProcessing(true);
+
+    setIsCracking(true);
     setProgress(0);
     setResult(null);
+    setError(null);
+
+    // Simulate the cracking process
+    const totalSteps = crackMethod === 'dictionary' 
+      ? dictionaryContent.split('\n').length 
+      : Math.min(500, Math.pow(bruteforceChars.length, Math.min(4, bruteforceMaxLength)));
     
-    // Simulate the cracking process with progress updates
-    const totalTime = attackType === 'dictionary' ? 3000 : 5000; // dictionary is faster
-    const interval = 100;
-    let currentProgress = 0;
-    
-    const updateInterval = setInterval(() => {
-      currentProgress += (interval / totalTime) * 100;
-      setProgress(Math.min(currentProgress, 99));
+    let currentStep = 0;
+    const knownHash = sampleHashes[hashType].hash.toLowerCase();
+    const targetPassword = sampleHashes[hashType].password;
+    const interval = setInterval(() => {
+      currentStep += 1;
+      const newProgress = Math.min(100, Math.floor((currentStep / totalSteps) * 100));
+      setProgress(newProgress);
       
-      if (currentProgress >= 100) {
-        clearInterval(updateInterval);
-        
-        // For demonstration, we'll "crack" certain known hashes
-        const lowerHash = hash.toLowerCase();
-        let foundPassword = null;
-        
-        // Check if it's one of our example hashes (for "password")
-        if (Object.values(commonHashes).some(h => h.toLowerCase() === lowerHash)) {
-          foundPassword = 'password';
-        } else if (lowerHash === '482c811da5d5b4bc6d497ffa98491e38') { // MD5 of "password123"
-          foundPassword = 'password123';
-        } else if (lowerHash === '5f4dcc3b5aa765d61d8327deb882cf99') { // MD5 of "password"
-          foundPassword = 'password';
-        } else if (hash.length === 32 && /^[a-fA-F0-9]+$/.test(hash)) {
-          // If it's a valid MD5 hash but not in our known list, pretend we found something for demo
-          foundPassword = 'demo_cracked_password';
-        }
+      // For demonstration purposes, we'll "find" the password if:
+      // 1. The hash matches one of our sample hashes
+      // 2. OR randomly with a small probability as progress increases
+      const hashMatches = hashValue.toLowerCase() === knownHash;
+      const randomSuccess = Math.random() < 0.005 * (newProgress / 100);
+      
+      if (hashMatches || (randomSuccess && newProgress > 30)) {
+        clearInterval(interval);
         
         setTimeout(() => {
-          setProgress(100);
-          
-          if (foundPassword) {
-            setResult(`Successfully cracked the hash!\n\nPassword: ${foundPassword}\n\nHash: ${hash}\nType: ${hashType.toUpperCase()}\nMethod: ${attackType === 'dictionary' ? 'Dictionary attack' : 'Brute force'}\n${customWordlist ? `Wordlist: ${customWordlist.name}` : ''}`);
-            toast({
-              title: "Password found!",
-              description: `The password is: ${foundPassword}`,
+          if (hashMatches) {
+            setResult({
+              password: targetPassword,
+              timeTaken: `${(Math.random() * 2 + 0.5).toFixed(2)} seconds`
             });
           } else {
-            setResult(`Could not crack the hash.\n\nHash: ${hash}\nType: ${hashType.toUpperCase()}\nMethod: ${attackType === 'dictionary' ? 'Dictionary attack' : 'Brute force'}\n\nTry a different wordlist or hash type.`);
-            toast({
-              title: "Cracking failed",
-              description: "Could not find the password. Try different settings.",
-              variant: "destructive"
+            // Generate a random password for demonstration
+            const dictionaryLines = dictionaryContent.split('\n');
+            const randomPassword = dictionaryLines.length > 0 
+              ? dictionaryLines[Math.floor(Math.random() * dictionaryLines.length)]
+              : Array(Math.floor(Math.random() * 8) + 4)
+                  .fill(0)
+                  .map(() => bruteforceChars.charAt(Math.floor(Math.random() * bruteforceChars.length)))
+                  .join('');
+            
+            setResult({
+              password: randomPassword,
+              timeTaken: `${(Math.random() * 10 + 1).toFixed(2)} seconds`
             });
           }
           
-          setIsProcessing(false);
-        }, 500);
+          setIsCracking(false);
+          setProgress(100);
+          
+          toast({
+            title: "Password Cracked",
+            description: "Successfully found the password!",
+          });
+        }, 1000);
+      } else if (newProgress >= 100) {
+        clearInterval(interval);
+        
+        setTimeout(() => {
+          setIsCracking(false);
+          setError("Could not crack the password with the current settings. Try a different approach or dictionary.");
+          
+          toast({
+            title: "Cracking Failed",
+            description: "Could not find the password. Try a different approach.",
+            variant: "destructive",
+          });
+        }, 1000);
       }
-    }, interval);
+    }, 100);
   };
 
   const handleReset = () => {
-    setHash('');
-    setCustomWordlist(null);
-    setUseDefaultWordlist(true);
-    setResult(null);
+    setHashValue('');
+    setHashType('md5');
+    setCrackMethod('dictionary');
+    setDictionaryContent('');
+    setBruteforceChars('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+    setBruteforceMaxLength(8);
+    setIsCracking(false);
     setProgress(0);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setResult(null);
+    setError(null);
   };
 
-  const handleSaveResult = () => {
+  const handleCopy = () => {
     if (!result) return;
     
-    const blob = new Blob([result], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = 'password_cracking_result.txt';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    navigator.clipboard.writeText(result.password);
+    toast({
+      title: "Copied to clipboard",
+      description: "The password has been copied to your clipboard.",
+    });
   };
 
   return (
-    <div className="animate-fade-up w-full max-w-3xl mx-auto">
+    <div className="animate-fade-up w-full max-w-2xl mx-auto">
       <div className="cyber-panel p-6">
         <div className="flex items-center mb-6">
           <KeyRound className="mr-2 h-6 w-6 text-cyber-blue" />
@@ -163,215 +214,206 @@ const PasswordCrackingTool: React.FC = () => {
           </Button>
         </div>
 
-        <div className="mb-6 p-3 bg-yellow-900/20 border border-yellow-600/30 rounded-md flex items-center">
-          <AlertTriangle className="h-5 w-5 text-yellow-500 mr-2 flex-shrink-0" />
-          <p className="text-sm text-yellow-200/80">
-            For educational purposes only. Use this tool to recover your own passwords or with explicit permission.
-          </p>
-        </div>
-
-        <Tabs defaultValue="hash" className="w-full">
-          <TabsList className="w-full grid grid-cols-2 mb-6">
-            <TabsTrigger value="hash">Hash Cracking</TabsTrigger>
-            <TabsTrigger value="wordlist">Wordlist Options</TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="hash" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="hash-type" className="text-sm mb-2 block text-gray-300">
-                  Hash Type
-                </Label>
-                <Select 
-                  value={hashType} 
-                  onValueChange={setHashType}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select hash type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="md5">MD5</SelectItem>
-                    <SelectItem value="sha1">SHA1</SelectItem>
-                    <SelectItem value="sha256">SHA256</SelectItem>
-                    <SelectItem value="ntlm">NTLM</SelectItem>
-                    <SelectItem value="bcrypt">BCrypt</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div>
-                <Label htmlFor="attack-type" className="text-sm mb-2 block text-gray-300">
-                  Attack Method
-                </Label>
-                <Select 
-                  value={attackType} 
-                  onValueChange={setAttackType}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select attack method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dictionary">Dictionary Attack</SelectItem>
-                    <SelectItem value="bruteforce">Brute Force</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            
-            <div>
-              <div className="flex justify-between items-center">
-                <Label htmlFor="hash" className="text-sm mb-2 block text-gray-300">
-                  Hash to Crack
-                </Label>
-                <Button 
-                  variant="link" 
-                  className="h-6 px-0 text-xs text-cyber-blue"
-                  onClick={handleExampleHash}
-                >
-                  Use Example
-                </Button>
-              </div>
-              <Textarea
-                id="hash"
-                value={hash}
-                onChange={(e) => setHash(e.target.value)}
-                placeholder="Enter hash value to crack (e.g., 5f4dcc3b5aa765d61d8327deb882cf99)"
-                className="font-mono resize-y"
-              />
-              <p className="text-xs text-gray-400 mt-1">
-                Enter a {hashType.toUpperCase()} hash that you want to crack.
-              </p>
-            </div>
-            
-            <Button
-              onClick={simulateCracking}
-              disabled={isProcessing || !hash.trim()}
-              className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
-            >
-              {isProcessing ? (
-                <>
-                  <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
-                  Cracking in progress...
-                </>
-              ) : (
-                <>
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Cracking
-                </>
-              )}
-            </Button>
-            
-            {isProcessing && (
-              <div className="w-full space-y-2">
-                <div className="flex justify-between text-xs text-gray-400">
-                  <span>Progress</span>
-                  <span>{Math.round(progress)}%</span>
-                </div>
-                <Progress value={progress} className="h-2" />
-              </div>
-            )}
-            
-            {result && (
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Results
-                  </Label>
-                  <Button
-                    onClick={handleSaveResult}
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-xs"
-                  >
-                    <Download className="mr-1 h-3 w-3" />
-                    Save
-                  </Button>
-                </div>
-                <div className={`font-mono text-sm p-4 rounded-md whitespace-pre-line ${result.includes('Successfully') ? 'bg-green-950/30 border border-green-500/30' : 'bg-cyber-darker border border-cyber-dark'}`}>
-                  {result}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="wordlist" className="space-y-6">
-            <div>
-              <Label className="text-sm mb-2 block text-gray-300">
-                Wordlist Option
+        <div className="space-y-6">
+          <div className="w-full">
+            <div className="flex justify-between items-center mb-2">
+              <Label htmlFor="hashType" className="text-sm text-gray-300">
+                Hash Type
               </Label>
-              <div className="space-y-2">
-                <div className="flex items-center">
-                  <input 
-                    type="radio" 
-                    id="default-wordlist" 
-                    checked={useDefaultWordlist}
-                    onChange={() => setUseDefaultWordlist(true)}
-                    className="mr-2"
-                  />
-                  <Label htmlFor="default-wordlist" className="text-sm cursor-pointer">
-                    Use default wordlist (100,000 common passwords)
-                  </Label>
-                </div>
-                <div className="flex items-center">
-                  <input 
-                    type="radio"
-                    id="custom-wordlist"
-                    checked={!useDefaultWordlist}
-                    onChange={() => setUseDefaultWordlist(false)}
-                    className="mr-2"
-                  />
-                  <Label htmlFor="custom-wordlist" className="text-sm cursor-pointer">
-                    Upload custom wordlist
-                  </Label>
-                </div>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={loadSampleHash}
+                className="h-6 px-2 text-xs"
+              >
+                Load Sample
+              </Button>
             </div>
-            
-            {!useDefaultWordlist && (
-              <div>
-                <Label htmlFor="wordlist-file" className="text-sm mb-2 block text-gray-300">
-                  Custom Wordlist (.txt)
-                </Label>
-                <div className="flex items-center gap-2">
+            <div className="flex gap-4">
+              <Select
+                value={hashType}
+                onValueChange={(value) => setHashType(value as HashType)}
+              >
+                <SelectTrigger id="hashType" className="w-full">
+                  <SelectValue placeholder="Select hash type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="md5">MD5</SelectItem>
+                  <SelectItem value="sha1">SHA-1</SelectItem>
+                  <SelectItem value="sha256">SHA-256</SelectItem>
+                  <SelectItem value="sha512">SHA-512</SelectItem>
+                  <SelectItem value="ntlm">NTLM</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">
+              Select the hashing algorithm used to generate the hash.
+            </p>
+          </div>
+          
+          <div className="w-full">
+            <Label htmlFor="hash" className="text-sm mb-2 block text-gray-300">
+              Hash Value
+            </Label>
+            <Input
+              id="hash"
+              value={hashValue}
+              onChange={(e) => setHashValue(e.target.value)}
+              placeholder="Enter the hash value to crack"
+              className="font-mono"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Example: 5f4dcc3b5aa765d61d8327deb882cf99 (MD5 hash of "password")
+            </p>
+          </div>
+          
+          <div className="w-full">
+            <Label className="text-sm mb-2 block text-gray-300">
+              Cracking Method
+            </Label>
+            <Tabs 
+              value={crackMethod} 
+              onValueChange={(value) => setCrackMethod(value as 'dictionary' | 'bruteforce')}
+              className="w-full"
+            >
+              <TabsList className="w-full grid grid-cols-2 mb-4">
+                <TabsTrigger value="dictionary">Dictionary Attack</TabsTrigger>
+                <TabsTrigger value="bruteforce">Brute Force</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="dictionary" className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label htmlFor="dictionary" className="text-sm text-gray-300">
+                      Password Dictionary
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={loadSampleDictionary}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <FileText className="mr-1 h-3 w-3" />
+                      Load Sample
+                    </Button>
+                  </div>
+                  <Textarea
+                    id="dictionary"
+                    value={dictionaryContent}
+                    onChange={(e) => setDictionaryContent(e.target.value)}
+                    placeholder="Enter passwords, one per line"
+                    className="font-mono resize-y min-h-[150px]"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Enter potential passwords, one per line. The more comprehensive your dictionary, the higher the chance of success.
+                  </p>
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="bruteforce" className="space-y-4">
+                <div>
+                  <Label htmlFor="charset" className="text-sm mb-2 block text-gray-300">
+                    Character Set
+                  </Label>
                   <Input
-                    ref={fileInputRef}
-                    id="wordlist-file"
-                    type="file"
-                    accept=".txt,.dict,.lst"
-                    onChange={handleFileChange}
+                    id="charset"
+                    value={bruteforceChars}
+                    onChange={(e) => setBruteforceChars(e.target.value)}
+                    placeholder="Characters to use in brute force"
                     className="font-mono"
                   />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="outline"
-                  >
-                    <Upload className="h-4 w-4 mr-1" />
-                    Browse
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">
-                  One password per line. Max file size: 10MB
-                </p>
-                
-                {customWordlist && (
-                  <p className="text-xs text-green-400 mt-2">
-                    ✓ {customWordlist.name} ({(customWordlist.size / 1024).toFixed(1)} KB) loaded
+                  <p className="text-xs text-gray-400 mt-1">
+                    Characters to use in the brute force attack. More characters increase the search space.
                   </p>
-                )}
-              </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="maxlength" className="text-sm mb-2 block text-gray-300">
+                    Maximum Length: {bruteforceMaxLength}
+                  </Label>
+                  <Input
+                    id="maxlength"
+                    type="range"
+                    min="4"
+                    max="12"
+                    value={bruteforceMaxLength}
+                    onChange={(e) => setBruteforceMaxLength(parseInt(e.target.value))}
+                    className="w-full"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>4</span>
+                    <span>8</span>
+                    <span>12</span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Maximum password length to try. Larger values exponentially increase cracking time.
+                  </p>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          <Button
+            onClick={handleStartCracking}
+            disabled={isCracking || !hashValue}
+            className="w-full bg-cyber-blue hover:bg-cyber-blue/80"
+          >
+            {isCracking ? (
+              <>
+                <div className="animate-spin h-4 w-4 border-2 border-white border-opacity-50 border-t-white rounded-full mr-2" />
+                Cracking... {progress}%
+              </>
+            ) : (
+              <>
+                <Play className="h-4 w-4 mr-2" />
+                Start Cracking
+              </>
             )}
-            
-            <div className="p-4 bg-cyber-darker rounded-md">
-              <h3 className="text-sm font-medium mb-2">Dictionary Attack Tips:</h3>
-              <ul className="text-xs text-gray-300 space-y-1 list-disc pl-4">
-                <li>Use specialized wordlists for specific targets (e.g., English words, names)</li>
-                <li>Common password lists are effective against many user accounts</li>
-                <li>For better results, use larger wordlists or combine multiple lists</li>
-                <li>Password variants (replacing 'a' with '@', etc.) are automatically tried</li>
-              </ul>
+          </Button>
+          
+          {isCracking && (
+            <div className="w-full">
+              <Progress value={progress} className="h-2 bg-gray-700" />
+              <p className="text-xs text-gray-400 text-center mt-1">
+                Testing possible passwords... This may take a while depending on complexity.
+              </p>
             </div>
-          </TabsContent>
-        </Tabs>
+          )}
+          
+          {error && (
+            <div className="w-full bg-red-900/30 border border-red-500/50 rounded-md p-4 flex items-start">
+              <AlertTriangle className="h-5 w-5 text-red-400 mr-2 flex-shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-medium text-red-400">Cracking Failed</h4>
+                <p className="text-sm text-gray-300">{error}</p>
+              </div>
+            </div>
+          )}
+          
+          {result && (
+            <div className="w-full bg-green-900/30 border border-green-500/50 rounded-md p-4">
+              <div className="flex items-start">
+                <CheckCircle2 className="h-5 w-5 text-green-400 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-green-400">Password Cracked!</h4>
+                  <p className="text-sm text-gray-300 mt-1">Completed in {result.timeTaken}</p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-7 px-2 text-xs"
+                >
+                  <Copy className="mr-1 h-3 w-3" />
+                  Copy
+                </Button>
+              </div>
+              <div className="mt-3 p-3 bg-black/30 rounded font-mono text-green-300 break-all">
+                {result.password}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

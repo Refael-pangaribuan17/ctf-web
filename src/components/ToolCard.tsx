@@ -1,55 +1,64 @@
 
 import React from 'react';
-import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 import { LucideIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-type ToolCardProps = {
+export interface ToolCardProps {
   title: string;
   description: string;
   icon: LucideIcon;
   onClick: () => void;
-  delayIndex: number;
-};
+  delayIndex?: number;
+  className?: string; // Add className prop
+}
 
 const ToolCard: React.FC<ToolCardProps> = ({ 
   title, 
   description, 
   icon: Icon, 
   onClick, 
-  delayIndex = 0 
+  delayIndex = 0,
+  className
 }) => {
-  const delay = `animate-delay-${delayIndex * 100}`;
-  
   return (
-    <button
-      onClick={onClick}
+    <motion.div
       className={cn(
-        "group relative w-full cyber-panel p-6 text-left transition-all duration-300 animate-fade-up",
-        "hover:bg-cyber-dark hover:shadow-[0_0_15px_rgba(14,165,233,0.4)] hover:-translate-y-1",
-        delay
+        "cyber-panel cursor-pointer hover:border-cyber-blue/50 transition-all duration-300 h-full",
+        className
       )}
+      onClick={onClick}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ 
+        opacity: 1, 
+        y: 0,
+        transition: { 
+          duration: 0.5,
+          delay: delayIndex * 0.1
+        }
+      }}
+      whileHover={{ 
+        scale: 1.03,
+        boxShadow: "0 0 15px rgba(0, 180, 255, 0.3)",
+        transition: { duration: 0.2 }
+      }}
     >
-      <div className="absolute inset-0 overflow-hidden rounded-lg">
-        <div className="absolute inset-0 bg-gradient-to-br from-cyber-blue/5 to-cyber-purple/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-      </div>
-      
-      <div className="flex items-start gap-4">
-        <div className="mt-1 p-2 rounded-md bg-cyber-blue/10 text-cyber-blue group-hover:bg-cyber-blue/20 transition-colors duration-300">
-          <Icon size={22} className="transition-transform duration-300 group-hover:scale-110" />
+      <div className="p-5 h-full flex flex-col">
+        <div className="mb-3 flex items-center">
+          <div className="bg-cyber-blue/20 p-2 rounded-md mr-3">
+            <Icon className="h-6 w-6 text-cyber-blue" />
+          </div>
+          <h3 className="text-lg font-bold">{title}</h3>
         </div>
-        
-        <div>
-          <h3 className="text-lg font-medium text-white group-hover:text-cyber-blue transition-colors duration-300">
-            {title}
-          </h3>
-          <p className="mt-1 text-sm text-gray-300">
-            {description}
-          </p>
+        <p className="text-sm text-gray-400 flex-grow">{description}</p>
+        <div className="mt-4 text-xs text-cyber-blue flex items-center justify-end">
+          <span>Open Tool</span>
+          <svg className="ml-1 h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </div>
       </div>
-      
-      <div className="absolute bottom-0 left-0 w-0 h-0.5 bg-cyber-blue transition-all duration-500 group-hover:w-full"></div>
-    </button>
+    </motion.div>
   );
 };
 
