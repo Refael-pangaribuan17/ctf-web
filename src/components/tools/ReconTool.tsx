@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,7 +58,7 @@ const ReconTool: React.FC = () => {
       const domain = extractDomain(target);
       const fakeWhoisData = {
         "Domain Name": domain,
-        "Registry Domain ID": `${Math.random().toString(36).substring(2, 15)}_DOMAIN_COM-VRSN`,
+        "Registry Domain ID": `${Math.random().toString(36).substring(2, 15)}_DOMAIN_COM-VRSN",
         "Registrar WHOIS Server": "whois.registrar.com",
         "Registrar URL": "http://www.registrar.com",
         "Updated Date": "2022-09-15T08:30:45Z",
@@ -71,7 +70,7 @@ const ReconTool: React.FC = () => {
         "Domain Status": "clientTransferProhibited",
         "Registry Registrant ID": "RT_${Math.random().toString(36).substring(2, 8)}",
         "Registrant Name": "Domain Administrator",
-        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} CORPORATION`,
+        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} CORPORATION",
         "Registrant Street": "123 Example St",
         "Registrant City": "Anytown",
         "Registrant State/Province": "CA",
@@ -79,8 +78,8 @@ const ReconTool: React.FC = () => {
         "Registrant Country": "US",
         "Registrant Phone": "+1.5555555555",
         "Registrant Email": `admin@${domain}`,
-        "Name Server": `ns1.${domain}`,
-        "Name Server": `ns2.${domain}`,
+        "Name Server 1": `ns1.${domain}`,
+        "Name Server 2": `ns2.${domain}`,
         "DNSSEC": "unsigned"
       };
 
