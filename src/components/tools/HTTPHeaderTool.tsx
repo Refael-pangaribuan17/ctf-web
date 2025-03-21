@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { RotateCcw, Copy, Network, ArrowRight } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -37,7 +36,40 @@ const HTTPHeaderTool: React.FC = () => {
         fullUrl = 'https://' + url;
       }
 
+      // Try the cors-anywhere proxy first
+      try {
+        const corsResponse = await fetch(`https://cors-anywhere.herokuapp.com/${fullUrl}`, {
+          method: 'HEAD',
+        });
+        
+        // Convert headers to an object
+        const headersObj: Record<string, string> = {};
+        corsResponse.headers.forEach((value, key) => {
+          headersObj[key] = value;
+        });
+        
+        setHeaders(headersObj);
+        
+        // Create raw header display
+        const rawHeadersText = Array.from(corsResponse.headers.entries())
+          .map(([key, value]) => `${key}: ${value}`)
+          .join('\n');
+        
+        setRawHeaders(rawHeadersText);
+        setIsLoading(false);
+        return;
+      } catch (corsError) {
+        console.log("CORS Anywhere failed, trying allorigins:", corsError);
+        // If cors-anywhere fails, try allorigins
+      }
+
+      // Fallback to AllOrigins
       const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+      
       const data = await response.json();
       
       if (data.status && data.status.http_code) {
@@ -60,6 +92,7 @@ const HTTPHeaderTool: React.FC = () => {
         throw new Error("Couldn't retrieve headers information");
       }
     } catch (err) {
+      console.error("Error fetching headers:", err);
       setError("Failed to retrieve headers. Make sure the URL is correct and the site is accessible.");
       toast({
         title: "Inspection Failed",
@@ -135,7 +168,7 @@ const HTTPHeaderTool: React.FC = () => {
               </Button>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Note: This tool uses a proxy to retrieve headers to avoid CORS issues
+              Note: This tool uses proxies to retrieve headers from websites while avoiding CORS issues
             </p>
           </div>
 
