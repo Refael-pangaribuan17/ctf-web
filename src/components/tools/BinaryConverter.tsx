@@ -36,7 +36,9 @@ const BinaryConverter: React.FC = () => {
         let result = '';
         
         if (fromFormat === 'text') {
-          const textToBytes = Array.from(input).map(char => char.charCodeAt(0));
+          // Get UTF-8 encoded bytes for proper unicode support
+          const encoder = new TextEncoder();
+          const textToBytes = Array.from(encoder.encode(input));
           
           if (toFormat === 'binary') {
             result = textToBytes.map(byte => byte.toString(2).padStart(8, '0')).join(' ');
@@ -47,11 +49,23 @@ const BinaryConverter: React.FC = () => {
           }
         } 
         else if (fromFormat === 'binary') {
-          const binaries = input.trim().split(/\s+/);
-          const bytes = binaries.map(bin => parseInt(bin, 2));
+          // Process binary input with validation
+          const binaries = input.trim().replace(/[^01\s]/g, '').split(/\s+/);
+          
+          // Validate each binary number
+          const validBinaries = binaries.filter(bin => /^[01]+$/.test(bin) && bin.length <= 32);
+          
+          if (validBinaries.length !== binaries.length) {
+            throw new Error("Invalid binary format. Binary values must contain only 0s and 1s.");
+          }
+          
+          const bytes = validBinaries.map(bin => parseInt(bin, 2));
           
           if (toFormat === 'text') {
-            result = bytes.map(byte => String.fromCharCode(byte)).join('');
+            // Convert to UTF-8 text
+            const decoder = new TextDecoder();
+            const uint8Array = new Uint8Array(bytes);
+            result = decoder.decode(uint8Array);
           } else if (toFormat === 'decimal') {
             result = bytes.join(' ');
           } else if (toFormat === 'hex') {
@@ -59,22 +73,47 @@ const BinaryConverter: React.FC = () => {
           }
         }
         else if (fromFormat === 'decimal') {
-          const decimals = input.trim().split(/\s+/).map(num => parseInt(num, 10));
+          // Process decimal input with validation
+          const decimals = input.trim().replace(/[^0-9\s]/g, '').split(/\s+/);
+          
+          // Validate decimal numbers
+          const validDecimals = decimals.filter(dec => /^\d+$/.test(dec) && parseInt(dec, 10) < 256);
+          
+          if (validDecimals.length !== decimals.length) {
+            throw new Error("Invalid decimal format. Values must be between 0-255.");
+          }
+          
+          const bytes = validDecimals.map(dec => parseInt(dec, 10));
           
           if (toFormat === 'text') {
-            result = decimals.map(dec => String.fromCharCode(dec)).join('');
+            // Convert to UTF-8 text
+            const decoder = new TextDecoder();
+            const uint8Array = new Uint8Array(bytes);
+            result = decoder.decode(uint8Array);
           } else if (toFormat === 'binary') {
-            result = decimals.map(dec => dec.toString(2).padStart(8, '0')).join(' ');
+            result = bytes.map(dec => dec.toString(2).padStart(8, '0')).join(' ');
           } else if (toFormat === 'hex') {
-            result = decimals.map(dec => dec.toString(16).padStart(2, '0')).join(' ');
+            result = bytes.map(dec => dec.toString(16).padStart(2, '0')).join(' ');
           }
         }
         else if (fromFormat === 'hex') {
-          const hexValues = input.trim().split(/\s+/);
-          const bytes = hexValues.map(hex => parseInt(hex, 16));
+          // Process hex input with validation
+          const hexValues = input.trim().replace(/[^0-9a-fA-F\s]/g, '').split(/\s+/);
+          
+          // Validate hex values
+          const validHex = hexValues.filter(hex => /^[0-9a-fA-F]+$/.test(hex) && hex.length <= 8);
+          
+          if (validHex.length !== hexValues.length) {
+            throw new Error("Invalid hexadecimal format. Hex values must contain only 0-9 and A-F.");
+          }
+          
+          const bytes = validHex.map(hex => parseInt(hex, 16));
           
           if (toFormat === 'text') {
-            result = bytes.map(byte => String.fromCharCode(byte)).join('');
+            // Convert to UTF-8 text
+            const decoder = new TextDecoder();
+            const uint8Array = new Uint8Array(bytes);
+            result = decoder.decode(uint8Array);
           } else if (toFormat === 'binary') {
             result = bytes.map(byte => byte.toString(2).padStart(8, '0')).join(' ');
           } else if (toFormat === 'decimal') {
@@ -90,9 +129,10 @@ const BinaryConverter: React.FC = () => {
           setLoadingState('idle');
         }, 500);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Invalid input for the selected conversion.";
         toast({
           title: "Processing Error",
-          description: "Invalid input for the selected conversion.",
+          description: errorMessage,
           variant: "destructive",
         });
         setOutput('');
@@ -128,6 +168,21 @@ const BinaryConverter: React.FC = () => {
     }
   };
 
+  // Helper function to generate example input based on current formats
+  const getExampleInput = () => {
+    const exampleText = "Hello";
+    const encoder = new TextEncoder();
+    const bytes = Array.from(encoder.encode(exampleText));
+    
+    switch (fromFormat) {
+      case 'text': return exampleText;
+      case 'binary': return bytes.map(b => b.toString(2).padStart(8, '0')).join(' ');
+      case 'decimal': return bytes.join(' ');
+      case 'hex': return bytes.map(b => b.toString(16).padStart(2, '0')).join(' ');
+      default: return exampleText;
+    }
+  };
+
   return (
     <div className="animate-fade-up w-full max-w-2xl mx-auto">
       <div className="cyber-panel p-6">
@@ -157,7 +212,7 @@ const BinaryConverter: React.FC = () => {
                   <SelectValue placeholder="Select format" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="text">Text (ASCII)</SelectItem>
+                  <SelectItem value="text">Text (UTF-8)</SelectItem>
                   <SelectItem value="binary">Binary</SelectItem>
                   <SelectItem value="decimal">Decimal</SelectItem>
                   <SelectItem value="hex">Hexadecimal</SelectItem>
@@ -174,13 +229,25 @@ const BinaryConverter: React.FC = () => {
                   <SelectValue placeholder="Select format" />
                 </SelectTrigger>
                 <SelectContent>
-                  {fromFormat !== "text" && <SelectItem value="text">Text (ASCII)</SelectItem>}
+                  {fromFormat !== "text" && <SelectItem value="text">Text (UTF-8)</SelectItem>}
                   {fromFormat !== "binary" && <SelectItem value="binary">Binary</SelectItem>}
                   {fromFormat !== "decimal" && <SelectItem value="decimal">Decimal</SelectItem>}
                   {fromFormat !== "hex" && <SelectItem value="hex">Hexadecimal</SelectItem>}
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          {/* Example button */}
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setInput(getExampleInput())}
+              className="text-xs"
+            >
+              Use Example
+            </Button>
           </div>
 
           {/* Input field */}

@@ -33,66 +33,126 @@ const MetadataExtractorTool: React.FC = () => {
     
     setIsExtracting(true);
     
-    // Simulating metadata extraction with a timeout
-    setTimeout(() => {
-      let extractedMetadata: Record<string, string> = {};
-      
-      // Generate sample metadata based on file type
-      if (file.type.startsWith('image/')) {
-        extractedMetadata = {
+    // Using FileReader for actual file data
+    const reader = new FileReader();
+    
+    reader.onload = () => {
+      // Create actual metadata based on file properties
+      setTimeout(() => {
+        let extractedMetadata: Record<string, string> = {
           "File Name": file.name,
           "File Size": formatFileSize(file.size),
-          "MIME Type": file.type,
-          "Created": new Date().toISOString(),
-          "Last Modified": new Date(file.lastModified).toISOString(),
-          "Image Width": "3024 px",
-          "Image Height": "4032 px",
-          "Color Space": "sRGB",
-          "Bit Depth": "24",
-          "Camera Make": "Apple",
-          "Camera Model": "iPhone 13 Pro",
-          "Focal Length": "4.2mm",
-          "Exposure Time": "1/120 sec",
-          "Aperture": "f/1.8",
-          "ISO": "100",
-          "GPS Latitude": "41.40338, 2.17403", // This is just an example, not real data
-          "Software": "iOS 15.4.1",
+          "MIME Type": file.type || "application/octet-stream",
+          "Last Modified": new Date(file.lastModified).toLocaleString(),
         };
-      } else if (file.type.startsWith('application/pdf')) {
-        extractedMetadata = {
-          "File Name": file.name,
-          "File Size": formatFileSize(file.size),
-          "MIME Type": file.type,
-          "Created": new Date().toISOString(),
-          "Last Modified": new Date(file.lastModified).toISOString(),
-          "PDF Version": "1.7",
-          "Page Count": "24",
-          "Author": "John Doe",
-          "Creator": "Microsoft Word",
-          "Producer": "Adobe PDF Library 15.0",
-          "Title": "Confidential Report",
-          "Subject": "Internal Use Only",
-          "Keywords": "secret, confidential, internal",
-          "Encrypted": "No",
-        };
-      } else {
-        extractedMetadata = {
-          "File Name": file.name,
-          "File Size": formatFileSize(file.size),
-          "MIME Type": file.type,
-          "Created": new Date().toISOString(),
-          "Last Modified": new Date(file.lastModified).toISOString(),
-        };
-      }
-      
-      setMetadata(extractedMetadata);
+        
+        // Add type-specific properties based on actual file type
+        if (file.type.startsWith('image/')) {
+          // For images, we can get actual dimensions by creating an Image object
+          const img = new Image();
+          const imageUrl = URL.createObjectURL(file);
+          
+          img.onload = () => {
+            const imageMetadata = {
+              ...extractedMetadata,
+              "Image Width": `${img.naturalWidth} px`,
+              "Image Height": `${img.naturalHeight} px`,
+              "Aspect Ratio": `${(img.naturalWidth / img.naturalHeight).toFixed(2)}`,
+              "File Extension": file.name.split('.').pop()?.toUpperCase() || "Unknown",
+            };
+            
+            setMetadata(imageMetadata);
+            setIsExtracting(false);
+            URL.revokeObjectURL(imageUrl);
+            
+            toast({
+              title: "Metadata extracted",
+              description: `Successfully extracted metadata from ${file.name}`,
+            });
+          };
+          
+          img.onerror = () => {
+            setMetadata(extractedMetadata);
+            setIsExtracting(false);
+            URL.revokeObjectURL(imageUrl);
+            
+            toast({
+              title: "Limited metadata extracted",
+              description: "Could not load complete image data",
+            });
+          };
+          
+          img.src = imageUrl;
+        } else if (file.type === 'application/pdf') {
+          // For PDFs, add common PDF properties
+          extractedMetadata = {
+            ...extractedMetadata,
+            "File Extension": "PDF",
+            "Document Type": "Portable Document Format",
+          };
+          setMetadata(extractedMetadata);
+          setIsExtracting(false);
+          
+          toast({
+            title: "Metadata extracted",
+            description: `Successfully extracted metadata from ${file.name}`,
+          });
+        } else if (file.type.startsWith('audio/')) {
+          // For audio files
+          extractedMetadata = {
+            ...extractedMetadata,
+            "File Extension": file.name.split('.').pop()?.toUpperCase() || "Unknown",
+            "Audio Type": file.type.split('/')[1]?.toUpperCase() || "Unknown",
+          };
+          setMetadata(extractedMetadata);
+          setIsExtracting(false);
+          
+          toast({
+            title: "Metadata extracted",
+            description: `Successfully extracted metadata from ${file.name}`,
+          });
+        } else if (file.type.startsWith('video/')) {
+          // For video files
+          extractedMetadata = {
+            ...extractedMetadata,
+            "File Extension": file.name.split('.').pop()?.toUpperCase() || "Unknown",
+            "Video Type": file.type.split('/')[1]?.toUpperCase() || "Unknown",
+          };
+          setMetadata(extractedMetadata);
+          setIsExtracting(false);
+          
+          toast({
+            title: "Metadata extracted",
+            description: `Successfully extracted metadata from ${file.name}`,
+          });
+        } else {
+          // Generic metadata for other file types
+          extractedMetadata = {
+            ...extractedMetadata,
+            "File Extension": file.name.split('.').pop()?.toUpperCase() || "Unknown",
+          };
+          setMetadata(extractedMetadata);
+          setIsExtracting(false);
+          
+          toast({
+            title: "Metadata extracted",
+            description: `Successfully extracted metadata from ${file.name}`,
+          });
+        }
+      }, 1500);
+    };
+    
+    reader.onerror = () => {
       setIsExtracting(false);
-      
       toast({
-        title: "Metadata extracted",
-        description: `Successfully extracted metadata from ${file.name}`,
+        title: "Error extracting metadata",
+        description: "Could not read the file",
+        variant: "destructive",
       });
-    }, 1500);
+    };
+    
+    // Start reading the file - just the header for metadata
+    reader.readAsArrayBuffer(file.slice(0, 16384)); // Read just the first 16KB
   };
 
   const handleCopy = () => {
@@ -182,7 +242,7 @@ const MetadataExtractorTool: React.FC = () => {
               </Button>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Supported file types: Images (JPG, PNG, GIF), Documents (PDF, DOCX), and others.
+              Supported file types: Images (JPG, PNG, GIF), Documents (PDF, DOCX), Audio, Video and others.
             </p>
           </div>
           

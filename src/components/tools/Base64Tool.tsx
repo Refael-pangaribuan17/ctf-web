@@ -20,6 +20,8 @@ const Base64Tool: React.FC = () => {
   useEffect(() => {
     if (input) {
       handleProcess();
+    } else {
+      setOutput('');
     }
   }, [input, mode, isBinary]);
 
@@ -34,33 +36,37 @@ const Base64Tool: React.FC = () => {
         
         if (mode === 'encode') {
           // For binary files/content, we'll use a different approach
-          if (isBinary) {
-            if (selectedFile) {
-              // For real file handling, we'd do this differently
-              // This is just a placeholder as we can't really read binary files in this demo
-              result = "[Binary file would be encoded here]";
-            } else {
-              // Simulate encoding binary data
-              const bytes = new TextEncoder().encode(input);
-              result = btoa(String.fromCharCode(...bytes));
-            }
+          if (isBinary && selectedFile) {
+            // This is a simulation since we can't actually read binary files in this demo
+            const fileType = selectedFile.type || 'application/octet-stream';
+            const fileSize = selectedFile.size;
+            const encoded = btoa(unescape(encodeURIComponent(`[Binary content from ${selectedFile.name} (${fileSize} bytes, ${fileType})]`)));
+            result = encoded;
           } else {
-            // Standard base64 encoding
-            result = btoa(input);
+            // Standard base64 encoding - handles UTF-8 properly
+            result = btoa(unescape(encodeURIComponent(input)));
           }
         } else {
           try {
-            // Base64 decoding
-            const decoded = atob(input);
+            // Base64 decoding with proper UTF-8 handling
+            const decoded = decodeURIComponent(escape(atob(input.trim())));
             
             // Check if the result looks like binary data
-            const isProbablyBinary = decoded.split('').some(char => {
-              const code = char.charCodeAt(0);
-              return code < 32 || code > 126;
-            });
+            const isProbablyBinary = (function() {
+              try {
+                const sample = decoded.slice(0, 100);
+                // Check for non-printable characters
+                return sample.split('').some(char => {
+                  const code = char.charCodeAt(0);
+                  return code < 32 && code !== 9 && code !== 10 && code !== 13; // Exclude tabs, newlines
+                });
+              } catch (e) {
+                return true; // If error in checking, assume binary
+              }
+            })();
             
             if (isProbablyBinary) {
-              result = "Detected binary content. Download the file to view.";
+              result = "[Binary content detected. Use the download button to save the file.]";
             } else {
               result = decoded;
             }
@@ -71,6 +77,11 @@ const Base64Tool: React.FC = () => {
         
         setOutput(result);
         setLoadingState('complete');
+        
+        // Reset complete state after a moment
+        setTimeout(() => {
+          setLoadingState('idle');
+        }, 500);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         toast({
@@ -122,26 +133,20 @@ const Base64Tool: React.FC = () => {
         });
       }
       
-      // Read file as text (in a real app, we'd use FileReader with readAsArrayBuffer for binary)
+      // Read file as text for demo purposes
       const reader = new FileReader();
       
-      reader.onload = (event) => {
-        if (typeof event.target?.result === 'string') {
-          const content = event.target.result.slice(0, 100000); // Limit size for demo
-          setInput(`[Content from file: ${file.name}]`);
-        }
-      };
-      
-      reader.onerror = () => {
-        toast({
-          title: "File Error",
-          description: "Could not read the selected file.",
-          variant: "destructive",
-        });
-      };
-      
-      // For text files, but for binary we'd use readAsArrayBuffer
-      reader.readAsText(file);
+      if (!isBinary) {
+        reader.onload = (event) => {
+          if (typeof event.target?.result === 'string') {
+            setInput(event.target.result.slice(0, 100000)); // Limit size for demo
+          }
+        };
+        reader.readAsText(file);
+      } else {
+        // Just set a placeholder for binary mode
+        setInput(`[File selected: ${file.name} (${file.size} bytes)]`);
+      }
     }
   };
 
@@ -152,7 +157,7 @@ const Base64Tool: React.FC = () => {
       let decodedContent;
       
       try {
-        decodedContent = atob(input);
+        decodedContent = atob(input.trim());
       } catch (e) {
         toast({
           title: "Decode Error",
@@ -239,7 +244,7 @@ const Base64Tool: React.FC = () => {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => setInput("{"name":"John Doe","age":30,"isActive":true}")}
+                  onClick={() => setInput('{"name":"John Doe","age":30,"isActive":true}')}
                   className="text-xs"
                 >
                   Example: JSON
@@ -315,7 +320,7 @@ const Base64Tool: React.FC = () => {
                     Copy
                   </Button>
                 )}
-                {mode === 'decode' && output && output.includes('binary') && (
+                {mode === 'decode' && output && output.includes('[Binary content') && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -353,7 +358,7 @@ const Base64Tool: React.FC = () => {
           </div>
 
           {/* Add file upload support */}
-          {mode === 'encode' && isBinary && (
+          {mode === 'encode' && (
             <div className="w-full mt-4">
               <Label htmlFor="file-upload" className="text-sm mb-2 block text-gray-300">
                 Or upload a file
@@ -395,3 +400,4 @@ const Base64Tool: React.FC = () => {
 };
 
 export default Base64Tool;
+
