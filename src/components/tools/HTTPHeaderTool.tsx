@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { RotateCcw, Copy, Network, ArrowRight } from 'lucide-react';
+import { RotateCcw, Copy, Network, ArrowRight, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 const HTTPHeaderTool: React.FC = () => {
@@ -35,68 +35,95 @@ const HTTPHeaderTool: React.FC = () => {
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         fullUrl = 'https://' + url;
       }
-
-      // Try the cors-anywhere proxy first
-      try {
-        const corsResponse = await fetch(`https://cors-anywhere.herokuapp.com/${fullUrl}`, {
-          method: 'HEAD',
-        });
+      
+      let headersFetched = false;
+      
+      // Try different proxies in sequence until one works
+      const proxies = [
+        { name: 'CORS Anywhere', url: `https://cors-anywhere.herokuapp.com/${fullUrl}` },
+        { name: 'AllOrigins', url: `https://api.allorigins.win/raw?url=${encodeURIComponent(fullUrl)}` },
+        { name: 'Corsproxy.io', url: `https://corsproxy.io/?${encodeURIComponent(fullUrl)}` }
+      ];
+      
+      for (const proxy of proxies) {
+        if (headersFetched) break;
         
-        // Convert headers to an object
-        const headersObj: Record<string, string> = {};
-        corsResponse.headers.forEach((value, key) => {
-          headersObj[key] = value;
-        });
-        
-        setHeaders(headersObj);
-        
-        // Create raw header display
-        const rawHeadersText = Array.from(corsResponse.headers.entries())
-          .map(([key, value]) => `${key}: ${value}`)
-          .join('\n');
-        
-        setRawHeaders(rawHeadersText);
-        setIsLoading(false);
-        return;
-      } catch (corsError) {
-        console.log("CORS Anywhere failed, trying allorigins:", corsError);
-        // If cors-anywhere fails, try allorigins
+        try {
+          console.log(`Trying ${proxy.name}...`);
+          const response = await fetch(proxy.url, {
+            method: 'GET',
+            mode: 'cors',
+            cache: 'no-cache',
+          });
+          
+          // Convert headers to an object
+          const headersObj: Record<string, string> = {};
+          response.headers.forEach((value, key) => {
+            headersObj[key] = value;
+          });
+          
+          // Add original URL request headers when available
+          if (response.headers.has('x-final-url')) {
+            headersObj['original-url'] = response.headers.get('x-final-url') || fullUrl;
+          } else {
+            headersObj['original-url'] = fullUrl;
+          }
+          
+          if (response.headers.has('access-control-expose-headers')) {
+            headersObj['access-control-expose-headers'] = response.headers.get('access-control-expose-headers') || '';
+          }
+          
+          setHeaders(headersObj);
+          
+          // Create raw header display
+          const rawHeadersText = Array.from(response.headers.entries())
+            .map(([key, value]) => `${key}: ${value}`)
+            .join('\n');
+          
+          setRawHeaders(rawHeadersText || 'No headers returned');
+          headersFetched = true;
+          
+          toast({
+            title: "Headers Retrieved",
+            description: `Successfully retrieved headers via ${proxy.name}`,
+          });
+          
+          break;
+        } catch (proxyError) {
+          console.error(`${proxy.name} failed:`, proxyError);
+          // Continue to next proxy
+        }
       }
-
-      // Fallback to AllOrigins
-      const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`);
       
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data.status && data.status.http_code) {
-        const headerEntries = Object.entries(data.status.headers || {});
-        const headersObj: Record<string, string> = {};
-        
-        headerEntries.forEach(([key, value]) => {
-          headersObj[key] = value as string;
-        });
-        
-        setHeaders(headersObj);
-        
-        // Create raw header display
-        const rawHeadersText = headerEntries
-          .map(([key, value]) => `${key}: ${value}`)
-          .join('\n');
-        
-        setRawHeaders(rawHeadersText);
-      } else {
-        throw new Error("Couldn't retrieve headers information");
+      if (!headersFetched) {
+        // Try direct fetch as last resort, which will likely fail due to CORS
+        try {
+          const response = await fetch(fullUrl, {
+            method: 'HEAD',
+            mode: 'no-cors' // This will result in an opaque response
+          });
+          
+          // With no-cors we can't access the headers, but we can know if the resource exists
+          toast({
+            title: "Limited Information",
+            description: "Resource exists, but detailed headers couldn't be retrieved due to CORS restrictions.",
+            variant: "warning"
+          });
+          
+          setRawHeaders(`Resource at ${fullUrl} exists, but headers cannot be accessed due to CORS restrictions.
+            
+Try using a server-side tool or browser extension to view complete headers.`);
+          
+        } catch (directError) {
+          throw new Error("All available methods to retrieve headers have failed");
+        }
       }
     } catch (err) {
       console.error("Error fetching headers:", err);
-      setError("Failed to retrieve headers. Make sure the URL is correct and the site is accessible.");
+      setError("Failed to retrieve headers. CORS restrictions prevented access to this URL's headers.");
       toast({
         title: "Inspection Failed",
-        description: "Failed to retrieve headers. Please check the URL and try again.",
+        description: "CORS restrictions prevented access to this URL's headers. Try a different URL or use a server-side tool.",
         variant: "destructive",
       });
     } finally {
@@ -168,7 +195,7 @@ const HTTPHeaderTool: React.FC = () => {
               </Button>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Note: This tool uses proxies to retrieve headers from websites while avoiding CORS issues
+              This tool uses proxy services to bypass CORS restrictions when fetching headers
             </p>
           </div>
 
@@ -207,6 +234,18 @@ const HTTPHeaderTool: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            {rawHeaders && rawHeaders.includes("CORS restrictions") && (
+              <div className="mt-4 p-3 border border-yellow-600/30 bg-yellow-900/20 rounded-md">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-300">
+                    <p className="font-medium text-yellow-400 mb-1">CORS Limitations</p>
+                    <p>Due to browser security restrictions, retrieving headers from some sites might be limited. For comprehensive header analysis, consider using tools like cURL, Postman, or browser developer tools.</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
