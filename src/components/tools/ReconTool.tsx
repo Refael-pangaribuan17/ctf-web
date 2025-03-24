@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -57,19 +57,34 @@ const ReconTool: React.FC = () => {
 
   const fetchDnsRecords = async (domain: string) => {
     try {
-      // Use DNS over HTTPS service
-      const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=A`, {
-        headers: {
-          'Accept': 'application/dns-json'
-        }
-      });
+      // Use multiple DNS over HTTPS services
+      const dnsServices = [
+        `https://cloudflare-dns.com/dns-query?name=${domain}&type=A`,
+        `https://dns.google/resolve?name=${domain}&type=A`,
+        `https://mozilla.cloudflare-dns.com/dns-query?name=${domain}&type=A`
+      ];
       
-      if (!response.ok) {
-        throw new Error('DNS request failed');
+      let dnsData = null;
+      
+      for (const service of dnsServices) {
+        try {
+          const response = await fetch(service, {
+            headers: {
+              'Accept': 'application/dns-json'
+            }
+          });
+          
+          if (response.ok) {
+            dnsData = await response.json();
+            if (dnsData?.Answer) break;
+          }
+        } catch (error) {
+          console.error(`Error with DNS service ${service}:`, error);
+          // Continue to next service
+        }
       }
       
-      const data = await response.json();
-      if (!data.Answer) {
+      if (!dnsData?.Answer) {
         throw new Error('No DNS records found');
       }
       
@@ -79,62 +94,80 @@ const ReconTool: React.FC = () => {
       };
       
       // Extract A records
-      data.Answer.forEach((record: any) => {
+      dnsData.Answer.forEach((record: any) => {
         if (record.type === 1) { // A record
           dnsRecords["A"].push(record.data);
         }
       });
       
-      // If we couldn't get real DNS data, use simulated data but with the real IP
-      if (dnsRecords["A"].length === 0) {
-        const ip = await fetchIpAddress(domain);
-        dnsRecords["A"] = [ip || "192.168.1.1"];
-      }
+      // Get more DNS record types
+      const recordTypes = ['AAAA', 'MX', 'NS', 'TXT', 'CAA', 'SOA'];
       
-      // Add simulated records for other types
-      dnsRecords["AAAA"] = [`2606:4700:3030::6815:${Math.floor(Math.random() * 9999)}`, `2606:4700:3031::6815:${Math.floor(Math.random() * 9999)}`];
-      dnsRecords["MX"] = [`alt1.aspmx.l.google.com.`, `alt2.aspmx.l.google.com.`];
-      dnsRecords["NS"] = [`ns1.${domain}`, `ns2.${domain}`];
-      dnsRecords["TXT"] = [`v=spf1 include:_spf.google.com ~all`, `google-site-verification=randomverificationstring`];
+      await Promise.all(recordTypes.map(async (type) => {
+        try {
+          const response = await fetch(`https://cloudflare-dns.com/dns-query?name=${domain}&type=${type}`, {
+            headers: {
+              'Accept': 'application/dns-json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.Answer && data.Answer.length > 0) {
+              dnsRecords[type] = data.Answer.map((record: any) => record.data);
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching ${type} records:`, error);
+          // If we can't get this record type, we just won't include it
+        }
+      }));
       
       return dnsRecords;
     } catch (error) {
       console.error('Error fetching DNS records:', error);
-      
-      // Fallback to simulated DNS data
-      const ip = await fetchIpAddress(domain);
-      
-      return {
-        "A": [ip || "192.168.1.1"],
-        "AAAA": [`2606:4700:3030::6815:${Math.floor(Math.random() * 9999)}`, `2606:4700:3031::6815:${Math.floor(Math.random() * 9999)}`],
-        "MX": [`alt1.aspmx.l.google.com.`, `alt2.aspmx.l.google.com.`],
-        "NS": [`ns1.${domain}`, `ns2.${domain}`],
-        "TXT": [`v=spf1 include:_spf.google.com ~all`, `google-site-verification=randomverificationstring`],
-        "CAA": [`0 issue "letsencrypt.org"`, `0 issue "pki.goog"`],
-        "SOA": [`ns1.${domain} hostmaster.${domain} ${Math.floor(Date.now()/1000)} 10800 3600 604800 38400`]
-      };
+      throw error;
     }
   };
 
   const fetchIpAddress = async (domain: string): Promise<string> => {
     try {
-      const response = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
-      const data = await response.json();
+      // Try multiple DNS services
+      const dnsServices = [
+        `https://dns.google/resolve?name=${domain}&type=A`,
+        `https://cloudflare-dns.com/dns-query?name=${domain}&type=A`,
+        `https://mozilla.cloudflare-dns.com/dns-query?name=${domain}&type=A`
+      ];
       
-      if (data.Answer && data.Answer.length > 0) {
-        // Return the first A record IP
-        return data.Answer[0].data;
+      for (const service of dnsServices) {
+        try {
+          const response = await fetch(service, {
+            headers: {
+              'Accept': 'application/dns-json'
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            if (data.Answer && data.Answer.length > 0) {
+              // Return the first A record IP
+              return data.Answer[0].data;
+            }
+          }
+        } catch (error) {
+          console.error(`Error with IP lookup service ${service}:`, error);
+          // Continue to next service
+        }
       }
       
       throw new Error('No IP records found');
     } catch (error) {
       console.error('Error fetching IP:', error);
-      // Generate a random IP that looks realistic
-      return `104.21.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+      throw error;
     }
   };
 
-  const fetchGeoIPData = async (ipOrDomain: string): Promise<any> => {
+  const fetchGeoIPData = async (ipOrDomain: string) => {
     try {
       // First get IP if domain was provided
       let ip = ipOrDomain;
@@ -144,6 +177,11 @@ const ReconTool: React.FC = () => {
       
       // Use ipapi.co for real geolocation data
       const response = await fetch(`https://ipapi.co/${ip}/json/`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch geo data');
+      }
+      
       const data = await response.json();
       
       if (data.error) {
@@ -161,17 +199,7 @@ const ReconTool: React.FC = () => {
       };
     } catch (error) {
       console.error('Error fetching GeoIP data:', error);
-      
-      // Fallback to simulated data
-      return {
-        ip: ipOrDomain,
-        city: "San Francisco",
-        country: "United States",
-        timezone: "America/Los_Angeles",
-        latitude: 37.7749,
-        longitude: -122.4194,
-        isp: "Cloudflare, Inc."
-      };
+      throw error;
     }
   };
 
@@ -188,67 +216,91 @@ const ReconTool: React.FC = () => {
     }
     
     setIsLoading(true);
+    setResults({
+      whois: null,
+      dns: null,
+      ports: null,
+      geoip: null
+    });
     
     try {
       const domain = extractDomain(target);
+      let dnsRecords = null;
+      let geoIpData = null;
       
-      // Start DNS and GeoIP requests in parallel
-      const [dnsRecords, geoIpData] = await Promise.all([
-        fetchDnsRecords(domain),
-        fetchGeoIPData(domain)
-      ]);
+      // Fetch real DNS and GeoIP data
+      try {
+        [dnsRecords, geoIpData] = await Promise.all([
+          fetchDnsRecords(domain).catch(error => {
+            console.error('DNS fetch error:', error);
+            toast({
+              title: "DNS Lookup Failed",
+              description: "Could not retrieve DNS records. CORS restrictions may be preventing access.",
+              variant: "destructive",
+            });
+            return null;
+          }),
+          fetchGeoIPData(domain).catch(error => {
+            console.error('GeoIP fetch error:', error);
+            toast({
+              title: "GeoIP Lookup Failed",
+              description: "Could not retrieve geolocation data for this domain.",
+              variant: "destructive",
+            });
+            return null;
+          })
+        ]);
+      } catch (error) {
+        console.error('Error in parallel fetches:', error);
+      }
       
-      // Generate simulated port scan based on the domain
-      // In a real tool, this would require server-side scanning
-      const ports = [
-        { port: 80, service: "HTTP", state: "open" },
-        { port: 443, service: "HTTPS", state: "open" },
-        { port: 21, service: "FTP", state: domain.includes('ftp') ? "open" : "closed" },
-        { port: 22, service: "SSH", state: domain.includes('ssh') || domain.includes('github') ? "open" : "filtered" },
-        { port: 25, service: "SMTP", state: domain.includes('mail') ? "open" : "filtered" },
-        { port: 53, service: "DNS", state: domain.includes('ns') || domain.includes('dns') ? "open" : "closed" },
-        { port: 110, service: "POP3", state: domain.includes('mail') ? "open" : "closed" },
-        { port: 143, service: "IMAP", state: domain.includes('mail') ? "open" : "closed" },
-        { port: 3306, service: "MySQL", state: "filtered" },
-        { port: 8080, service: "HTTP-Proxy", state: "closed" },
-      ];
-      
-      // Generate simulated WHOIS data based on domain
-      // In a real tool, this would require a WHOIS API
-      const whoisData = {
-        "Domain Name": domain,
-        "Registry Domain ID": `${domain.replace(/\./g, "")}-DOMAIN-COM-VRSN`,
-        "Registrar WHOIS Server": "whois.registrar.com",
-        "Registrar URL": "http://www.registrar.com",
-        "Updated Date": "2023-04-15T08:30:45Z",
-        "Creation Date": "2010-03-28T07:12:25Z",
-        "Registrar Registration Expiration Date": "2025-03-28T07:12:25Z",
-        "Registrar": "Example Registrar, Inc.",
-        "Registrar Abuse Contact Email": `abuse@${domain}`,
-        "Registrar Abuse Contact Phone": "+1.5555555555",
-        "Domain Status": "clientTransferProhibited",
-        "Registry Registrant ID": `RT_${domain.replace(/\./g, "")}`,
-        "Registrant Name": "Domain Administrator",
-        "Registrant Organization": `${domain.split('.')[0].toUpperCase()} ORGANIZATION`,
-        "Registrant Street": "123 Business Street",
-        "Registrant City": geoIpData.city,
-        "Registrant Country": geoIpData.country,
-        "Registrant Phone": "+1.5555551234",
-        "Registrant Email": `admin@${domain}`,
-        "Name Server 1": `ns1.${domain}`,
-        "Name Server 2": `ns2.${domain}`
+      // For WHOIS, we can't do this client-side due to CORS, so we explain this limitation
+      const whoisLimitation = {
+        "Information": "WHOIS data cannot be retrieved directly from the browser due to CORS restrictions.",
+        "Alternative": "Use a command-line tool like 'whois' or a service like whois.com to get this information.",
+        "Domain": domain,
+        "Note": "Most modern browsers prevent cross-origin requests to WHOIS servers for security reasons.",
+        "Recommendation": "For real WHOIS data, use a server-side API or dedicated WHOIS lookup service."
       };
       
+      // Port scanning can't be done from the browser, so explain this
+      const portScanningLimitation = [
+        { 
+          port: 0, 
+          service: "Information", 
+          state: "info",
+          notes: "Browser security restrictions prevent real port scanning from client-side JavaScript."
+        },
+        { 
+          port: 0, 
+          service: "Alternative", 
+          state: "info",
+          notes: "For security testing, use dedicated tools like Nmap from your local machine."
+        },
+        { 
+          port: 0, 
+          service: "Common Ports", 
+          state: "info",
+          notes: "Port 80 (HTTP), 443 (HTTPS), 21 (FTP), 22 (SSH), 25 (SMTP), 53 (DNS), etc."
+        },
+        { 
+          port: 0, 
+          service: "Legal Notice", 
+          state: "warning",
+          notes: "Port scanning without permission may be illegal in some jurisdictions."
+        }
+      ];
+      
       setResults({
-        whois: whoisData,
+        whois: whoisLimitation,
         dns: dnsRecords,
-        ports: ports,
+        ports: portScanningLimitation,
         geoip: geoIpData
       });
       
       toast({
         title: "Reconnaissance Complete",
-        description: `Successfully gathered information for ${domain}`,
+        description: `Successfully gathered available information for ${domain}`,
       });
     } catch (error) {
       console.error('Error during reconnaissance:', error);
@@ -339,7 +391,7 @@ const ReconTool: React.FC = () => {
             </div>
           </div>
           <p className="text-xs text-gray-400 mt-2">
-            Note: This tool performs simulated reconnaissance for educational purposes only.
+            Note: Some data may be limited due to browser security restrictions.
           </p>
         </form>
 
@@ -380,6 +432,16 @@ const ReconTool: React.FC = () => {
                   </div>
                 </div>
               )}
+              
+              <div className="p-3 border border-yellow-500/30 bg-yellow-900/20 rounded-md">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-yellow-400 mr-2 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-gray-300">
+                    <p className="font-medium text-yellow-400 mb-1">Browser Limitations</p>
+                    <p>WHOIS data cannot be accessed directly from browsers due to CORS security restrictions. For authentic WHOIS data, use command-line tools or WHOIS lookup websites.</p>
+                  </div>
+                </div>
+              </div>
             </TabsContent>
             
             <TabsContent value="dns" className="space-y-4">
@@ -398,7 +460,7 @@ const ReconTool: React.FC = () => {
                 )}
               </div>
               
-              {results.dns && (
+              {results.dns ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {Object.entries(results.dns).map(([recordType, values]) => (
                     <div key={recordType} className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
@@ -415,12 +477,16 @@ const ReconTool: React.FC = () => {
                     </div>
                   ))}
                 </div>
+              ) : (
+                <div className="bg-cyber-darker border border-cyber-dark rounded-md p-6 text-center">
+                  <p className="text-gray-400">No DNS records could be retrieved. This may be due to CORS restrictions or because the domain doesn't exist.</p>
+                </div>
               )}
             </TabsContent>
             
             <TabsContent value="ports" className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium">Port Scan Results</h3>
+                <h3 className="text-lg font-medium">Port Scan Information</h3>
                 {results.ports && (
                   <Button
                     variant="outline"
@@ -439,23 +505,21 @@ const ReconTool: React.FC = () => {
                   <table className="min-w-full divide-y divide-cyber-dark">
                     <thead className="bg-cyber-blue/10">
                       <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Port</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Service</th>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">State</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Information</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-cyber-dark">
-                      {results.ports.map((port, index) => (
+                      {results.ports.map((item, index) => (
                         <tr key={index}>
-                          <td className="px-4 py-2 whitespace-nowrap font-mono text-sm">{port.port}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm">{port.service}</td>
-                          <td className="px-4 py-2 whitespace-nowrap text-sm">
+                          <td className="px-4 py-2 whitespace-nowrap text-sm font-medium">{item.service}</td>
+                          <td className="px-4 py-2 text-sm">
                             <span className={`px-2 py-1 rounded-full text-xs ${
-                              port.state === 'open' ? 'bg-green-900/30 text-green-400' :
-                              port.state === 'closed' ? 'bg-red-900/30 text-red-400' :
-                              'bg-yellow-900/30 text-yellow-400'
+                              item.state === 'info' ? 'bg-blue-900/30 text-blue-400' :
+                              item.state === 'warning' ? 'bg-yellow-900/30 text-yellow-400' :
+                              'bg-gray-900/30 text-gray-400'
                             }`}>
-                              {port.state}
+                              {item.notes}
                             </span>
                           </td>
                         </tr>
@@ -469,8 +533,8 @@ const ReconTool: React.FC = () => {
                 <div className="flex items-start">
                   <AlertCircle className="h-5 w-5 text-blue-400 mr-2 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-gray-300">
-                    <p className="font-medium text-blue-400 mb-1">This is a simulation</p>
-                    <p>In a real security tool, active port scanning would require proper authorization from the target owner. Unauthorized port scanning may be illegal in some jurisdictions.</p>
+                    <p className="font-medium text-blue-400 mb-1">Browser Limitations</p>
+                    <p>Due to security restrictions, browsers cannot perform real port scans. For actual port scanning, use dedicated tools like Nmap from your local machine. Remember that unauthorized port scanning may be illegal in some jurisdictions.</p>
                   </div>
                 </div>
               </div>
@@ -492,7 +556,7 @@ const ReconTool: React.FC = () => {
                 )}
               </div>
               
-              {results.geoip && (
+              {results.geoip ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-cyber-darker border border-cyber-dark rounded-md overflow-hidden">
                     <div className="p-2 border-b border-cyber-dark bg-cyber-blue/10">
@@ -552,6 +616,10 @@ const ReconTool: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div className="bg-cyber-darker border border-cyber-dark rounded-md p-6 text-center">
+                  <p className="text-gray-400">Could not retrieve geolocation data for this target. This may be due to API limitations or because the IP/domain couldn't be resolved.</p>
                 </div>
               )}
             </TabsContent>

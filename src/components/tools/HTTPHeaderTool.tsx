@@ -107,7 +107,7 @@ const HTTPHeaderTool: React.FC = () => {
           toast({
             title: "Limited Information",
             description: "Resource exists, but detailed headers couldn't be retrieved due to CORS restrictions.",
-            variant: "warning"
+            variant: "default"
           });
           
           setRawHeaders(`Resource at ${fullUrl} exists, but headers cannot be accessed due to CORS restrictions.
