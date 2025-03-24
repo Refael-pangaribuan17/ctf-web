@@ -7,10 +7,28 @@ import { Search, RotateCcw, Copy, Server } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
-// Utility to validate domain format
-const isValidDomain = (domain: string) => {
-  const pattern = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-  return pattern.test(domain);
+// Utility to validate domain/URL format with more flexible approach
+const isValidDomain = (input: string) => {
+  // Clean input by removing protocols and paths
+  let domain = input.trim();
+  
+  // Remove protocol if exists
+  if (domain.startsWith('http://') || domain.startsWith('https://')) {
+    domain = domain.split('//')[1];
+  }
+  
+  // Remove path and query params if exist
+  if (domain.includes('/')) {
+    domain = domain.split('/')[0];
+  }
+  
+  // Basic domain pattern
+  // Allow subdomains, second-level domains, and top-level domains like .com, .net, .org, etc.
+  // Also allow IP addresses
+  const ipPattern = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+  const domainPattern = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$/;
+  
+  return domainPattern.test(domain) || ipPattern.test(domain);
 };
 
 interface DNSRecord {
@@ -46,32 +64,56 @@ const ReconTool: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dns');
   const [portResults, setPortResults] = useState<PortData[]>([]);
   const [whoisData, setWhoisData] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const normalizeDomain = (input: string): string => {
+    let normalized = input.trim();
+    
+    // Remove protocol if exists
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      normalized = normalized.split('//')[1];
+    }
+    
+    // Remove path and query params if exist
+    if (normalized.includes('/')) {
+      normalized = normalized.split('/')[0];
+    }
+    
+    return normalized;
+  };
+
   const fetchDNSRecords = async (domain: string): Promise<DNSRecord[]> => {
+    const normalizedDomain = normalizeDomain(domain);
+    console.log(`Attempting to fetch DNS records for: ${normalizedDomain}`);
+    
     // Use a public API service that supports CORS
     try {
-      const response = await fetch(`https://dns.google/resolve?name=${domain}&type=A`, {
+      const response = await fetch(`https://dns.google/resolve?name=${normalizedDomain}&type=A`, {
         headers: {
           'Accept': 'application/dns-json',
         }
       });
       
       if (!response.ok) {
+        console.log(`Google DNS API response not OK: ${response.status}`);
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       
       const data = await response.json();
+      console.log("Google DNS API response:", data);
       
       if (!data.Answer || data.Answer.length === 0) {
         // Try ipinfo.io as fallback for A records
-        const ipinfoResponse = await fetch(`https://ipinfo.io/${domain}/json`);
+        console.log("No DNS records found, trying ipinfo.io...");
+        const ipinfoResponse = await fetch(`https://ipinfo.io/${normalizedDomain}/json`);
         if (ipinfoResponse.ok) {
           const ipData = await ipinfoResponse.json();
+          console.log("ipinfo.io response:", ipData);
           if (ipData.ip) {
             return [{
               type: 'A',
-              name: domain,
+              name: normalizedDomain,
               value: ipData.ip,
               ttl: 300
             }];
@@ -94,33 +136,75 @@ const ReconTool: React.FC = () => {
         ttl: record.TTL
       }));
     } catch (error) {
+      console.error("Primary DNS resolution failed:", error);
+      
       // Try alternative DNS resolver
       try {
+        console.log("Trying alternative: ipapi.co...");
         // Try with ipapi.co which supports CORS
-        const ipapiResponse = await fetch(`https://ipapi.co/${domain}/json/`);
+        const ipapiResponse = await fetch(`https://ipapi.co/${normalizedDomain}/json/`);
         if (ipapiResponse.ok) {
           const ipData = await ipapiResponse.json();
+          console.log("ipapi.co response:", ipData);
           if (ipData.ip && !ipData.error) {
             return [{
               type: 'A',
-              name: domain,
+              name: normalizedDomain,
               value: ipData.ip,
               ttl: 300
             }];
           }
         }
         
-        // Try another direct approach with domain-ip.info
-        const domainIpResponse = await fetch(`https://api.domainsdb.info/v1/domains/search?domain=${domain}`);
-        if (domainIpResponse.ok) {
-          const domainData = await domainIpResponse.json();
-          if (domainData.domains && domainData.domains.length > 0) {
-            return domainData.domains.map((item: any) => ({
-              type: 'A',
-              name: item.domain,
-              value: item.A || "No IP available",
-              ttl: 300
+        // Try cloudflare DNS over HTTPS
+        console.log("Trying Cloudflare DNS...");
+        const cloudflareResponse = await fetch(`https://cloudflare-dns.com/dns-query?name=${normalizedDomain}&type=A`, {
+          headers: {
+            'Accept': 'application/dns-json'
+          }
+        });
+        
+        if (cloudflareResponse.ok) {
+          const cloudflareData = await cloudflareResponse.json();
+          console.log("Cloudflare DNS response:", cloudflareData);
+          
+          if (cloudflareData.Answer && cloudflareData.Answer.length > 0) {
+            return cloudflareData.Answer.map((record: any) => ({
+              type: record.type === 1 ? 'A' : 
+                    record.type === 5 ? 'CNAME' : 
+                    record.type === 28 ? 'AAAA' : 
+                    record.type === 15 ? 'MX' : 
+                    record.type === 16 ? 'TXT' : 
+                    record.type === 2 ? 'NS' : 
+                    `Type ${record.type}`,
+              name: record.name,
+              value: record.data,
+              ttl: record.TTL
             }));
+          }
+        }
+        
+        // Try another approach - fetch from public APIs
+        console.log("Trying public-apis.io...");
+        const publicApisResponse = await fetch(`https://api.api-ninjas.com/v1/dnslookup?domain=${normalizedDomain}`, {
+          headers: {
+            'X-Api-Key': 'YOUR_API_KEY'
+          }
+        });
+        
+        if (publicApisResponse.ok) {
+          const dnsData = await publicApisResponse.json();
+          console.log("API Ninjas response:", dnsData);
+          
+          if (Array.isArray(dnsData) && dnsData.length > 0) {
+            return dnsData
+              .filter((record: any) => record && record.record_type && record.value)
+              .map((record: any) => ({
+                type: record.record_type,
+                name: normalizedDomain,
+                value: record.value,
+                ttl: record.ttl || 300
+              }));
           }
         }
       } catch (fallbackError) {
@@ -129,13 +213,15 @@ const ReconTool: React.FC = () => {
       
       // Final fallback - use ipinfo.io with the domain directly
       try {
-        const response = await fetch(`https://ipinfo.io/${encodeURIComponent(domain)}/json`);
+        console.log("Final fallback with ipinfo.io...");
+        const response = await fetch(`https://ipinfo.io/${encodeURIComponent(normalizedDomain)}/json`);
         if (response.ok) {
           const data = await response.json();
+          console.log("Final ipinfo.io response:", data);
           if (data.ip) {
             return [{
               type: 'A',
-              name: domain,
+              name: normalizedDomain,
               value: data.ip,
               ttl: 300
             }];
@@ -145,22 +231,28 @@ const ReconTool: React.FC = () => {
         console.error("All DNS resolution attempts failed");
       }
       
-      throw new Error('Unable to fetch DNS records due to CORS restrictions. Try using a browser extension or server-side tool.');
+      throw new Error('Unable to fetch DNS records. This could be due to CORS restrictions or the domain not existing.');
     }
   };
 
   const fetchGeoIPData = async (domain: string): Promise<GeoIPData> => {
+    const normalizedDomain = normalizeDomain(domain);
+    console.log(`Attempting to fetch GeoIP data for: ${normalizedDomain}`);
+    
     // First try to get IP from our DNS records
     let ip = '';
     const dnsRecord = dnsRecords.find(record => record.type === 'A');
     if (dnsRecord) {
       ip = dnsRecord.value;
+      console.log(`Using IP from DNS records: ${ip}`);
     } else {
       // Try to resolve it directly
       try {
-        const ipinfoResponse = await fetch(`https://ipinfo.io/${domain}/json`);
+        console.log("Trying to resolve IP directly from ipinfo.io...");
+        const ipinfoResponse = await fetch(`https://ipinfo.io/${normalizedDomain}/json`);
         if (ipinfoResponse.ok) {
           const ipData = await ipinfoResponse.json();
+          console.log("ipinfo.io direct response:", ipData);
           if (ipData.ip) {
             ip = ipData.ip;
           }
@@ -173,9 +265,11 @@ const ReconTool: React.FC = () => {
     if (!ip) {
       // Try to get IP from ipapi
       try {
-        const ipapiResponse = await fetch(`https://ipapi.co/${domain}/json/`);
+        console.log("Trying to resolve IP from ipapi.co...");
+        const ipapiResponse = await fetch(`https://ipapi.co/${normalizedDomain}/json/`);
         if (ipapiResponse.ok) {
           const ipData = await ipapiResponse.json();
+          console.log("ipapi.co direct response:", ipData);
           if (ipData.ip && !ipData.error) {
             ip = ipData.ip;
           }
@@ -191,11 +285,13 @@ const ReconTool: React.FC = () => {
 
     // Now use ipinfo.io to get detailed GeoIP data
     try {
+      console.log(`Fetching detailed GeoIP data for IP: ${ip}`);
       const response = await fetch(`https://ipinfo.io/${ip}/json`);
       if (!response.ok) {
         throw new Error(`HTTP error! Status: ${response.status}`);
       }
       const data = await response.json();
+      console.log("GeoIP data from ipinfo.io:", data);
       return {
         ip: data.ip,
         hostname: data.hostname,
@@ -208,13 +304,18 @@ const ReconTool: React.FC = () => {
         timezone: data.timezone
       };
     } catch (error) {
+      console.error("Primary GeoIP lookup failed:", error);
+      
       // Fallback to ipapi.co
       try {
+        console.log("Trying fallback GeoIP with ipapi.co...");
         const response = await fetch(`https://ipapi.co/${ip}/json/`);
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         const data = await response.json();
+        console.log("GeoIP data from ipapi.co:", data);
+        
         if (data.error) {
           throw new Error(data.reason || 'API error');
         }
@@ -235,17 +336,19 @@ const ReconTool: React.FC = () => {
     }
   };
 
-  const simulateWHOISLookup = (domain: string): string => {
+  const generateWHOISLookup = async (domain: string): Promise<string> => {
+    const normalizedDomain = normalizeDomain(domain);
+    
     // WHOIS lookups cannot be done client-side due to CORS, so we'll explain this
     return `
-Domain Name: ${domain.toUpperCase()}
+Domain Name: ${normalizedDomain.toUpperCase()}
 
 NOTE: Real WHOIS lookups cannot be performed directly in the browser due to CORS limitations.
 
 To perform an actual WHOIS lookup, you can:
 1. Use a command-line tool like 'whois' on Linux/Mac or online WHOIS services
-2. Visit https://whois.domaintools.com/${domain} 
-3. Visit https://www.whois.com/whois/${domain}
+2. Visit https://whois.domaintools.com/${normalizedDomain} 
+3. Visit https://www.whois.com/whois/${normalizedDomain}
 
 A WHOIS query provides domain registration information including:
 - Registrar information
@@ -256,7 +359,7 @@ A WHOIS query provides domain registration information including:
 `;
   };
 
-  const simulatePortScan = (domain: string): PortData[] => {
+  const generatePortScanInfo = (domain: string): PortData[] => {
     // Port scanning cannot be done client-side, so we'll explain this
     const commonPorts: PortData[] = [
       { port: 80, service: 'HTTP', state: 'Browser limits' },
@@ -279,8 +382,11 @@ A WHOIS query provides domain registration information including:
       return;
     }
     
-    // Basic domain format validation
-    if (!isValidDomain(domain)) {
+    const normalizedDomain = normalizeDomain(domain);
+    console.log(`Normalized domain: ${normalizedDomain}`);
+    
+    // Less strict domain validation
+    if (!normalizedDomain.includes('.')) {
       toast({
         title: "Invalid Domain",
         description: "Please enter a valid domain name (e.g., example.com).",
@@ -294,20 +400,22 @@ A WHOIS query provides domain registration information including:
     setGeoIPData(null);
     setPortResults([]);
     setWhoisData('');
+    setError(null);
     
     try {
       // Process the selected tab
       if (activeTab === 'dns' || activeTab === 'geoip') {
         // DNS lookups are needed for both DNS and GeoIP tabs
-        const records = await fetchDNSRecords(domain);
+        const records = await fetchDNSRecords(normalizedDomain);
         setDnsRecords(records);
         
         if (activeTab === 'geoip') {
           try {
-            const geoData = await fetchGeoIPData(domain);
+            const geoData = await fetchGeoIPData(normalizedDomain);
             setGeoIPData(geoData);
           } catch (geoError) {
             console.error("GeoIP fetch error:", geoError);
+            setError(geoError instanceof Error ? geoError.message : "Failed to retrieve geolocation data.");
             toast({
               title: "GeoIP Lookup Failed",
               description: geoError instanceof Error ? geoError.message : "Failed to retrieve geolocation data.",
@@ -316,19 +424,20 @@ A WHOIS query provides domain registration information including:
           }
         }
       } else if (activeTab === 'whois') {
-        const whoisInfo = simulateWHOISLookup(domain);
+        const whoisInfo = await generateWHOISLookup(normalizedDomain);
         setWhoisData(whoisInfo);
       } else if (activeTab === 'portscan') {
-        const portInfo = simulatePortScan(domain);
+        const portInfo = generatePortScanInfo(normalizedDomain);
         setPortResults(portInfo);
       }
       
       toast({
         title: "Analysis Complete",
-        description: `Reconnaissance data retrieved for ${domain}`,
+        description: `Reconnaissance data retrieved for ${normalizedDomain}`,
       });
     } catch (error) {
       console.error("Recon error:", error);
+      setError(error instanceof Error ? error.message : "Failed to retrieve reconnaissance data.");
       toast({
         title: "Analysis Failed",
         description: error instanceof Error ? error.message : "Failed to retrieve reconnaissance data.",
@@ -345,6 +454,7 @@ A WHOIS query provides domain registration information including:
     setGeoIPData(null);
     setPortResults([]);
     setWhoisData('');
+    setError(null);
   };
 
   const handleCopy = (content: string) => {
@@ -402,9 +512,16 @@ A WHOIS query provides domain registration information including:
               </Button>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              Enter a domain name to perform reconnaissance
+              Enter a domain name to perform reconnaissance (e.g., example.com, google.com)
             </p>
           </div>
+
+          {/* Error display */}
+          {error && (
+            <div className="w-full bg-red-900/30 border border-red-500/50 rounded-md p-3">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+          )}
 
           {/* Tabs for different recon types */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
