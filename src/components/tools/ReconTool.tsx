@@ -3,444 +3,107 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Search, RotateCcw, Copy, Server } from 'lucide-react';
-import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Search, Globe, Server, Activity, RotateCcw, ExternalLink, AlertCircle } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
-// Utility to validate domain/URL format with more flexible approach
-const isValidDomain = (input: string) => {
-  // Clean input by removing protocols and paths
-  let domain = input.trim();
-  
-  // Remove protocol if exists
-  if (domain.startsWith('http://') || domain.startsWith('https://')) {
-    domain = domain.split('//')[1];
-  }
-  
-  // Remove path and query params if exist
-  if (domain.includes('/')) {
-    domain = domain.split('/')[0];
-  }
-  
-  // Basic domain pattern
-  // Allow subdomains, second-level domains, and top-level domains like .com, .net, .org, etc.
-  // Also allow IP addresses
-  const ipPattern = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
-  const domainPattern = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$/;
-  
-  return domainPattern.test(domain) || ipPattern.test(domain);
-};
-
-interface DNSRecord {
+type DnsRecord = {
   type: string;
-  name: string;
   value: string;
   ttl?: number;
-}
+};
 
-interface GeoIPData {
+type GeoIpInfo = {
   ip: string;
-  hostname?: string;
+  country?: string;
   city?: string;
   region?: string;
-  country?: string;
   loc?: string;
   org?: string;
-  postal?: string;
   timezone?: string;
-}
+};
 
-interface PortData {
+type WhoisInfo = {
+  domain: string;
+  registrar?: string;
+  createdDate?: string;
+  updatedDate?: string;
+  expiresDate?: string;
+  status?: string[];
+  nameservers?: string[];
+};
+
+type PortInfo = {
   port: number;
   service: string;
-  state: string;
-}
+  status: 'open' | 'closed' | 'filtered';
+};
 
 const ReconTool: React.FC = () => {
   const [domain, setDomain] = useState('');
-  const [dnsRecords, setDnsRecords] = useState<DNSRecord[]>([]);
-  const [geoIPData, setGeoIPData] = useState<GeoIPData | null>(null);
+  const [tab, setTab] = useState('dns');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState('dns');
-  const [portResults, setPortResults] = useState<PortData[]>([]);
-  const [whoisData, setWhoisData] = useState<string>('');
+  const [dnsRecords, setDnsRecords] = useState<DnsRecord[]>([]);
+  const [geoIpInfo, setGeoIpInfo] = useState<GeoIpInfo | null>(null);
+  const [whoisInfo, setWhoisInfo] = useState<WhoisInfo | null>(null);
+  const [portInfo, setPortInfo] = useState<PortInfo[]>([]);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const normalizeDomain = (input: string): string => {
+    // Remove protocol and path components
     let normalized = input.trim();
-    
-    // Remove protocol if exists
-    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-      normalized = normalized.split('//')[1];
-    }
-    
-    // Remove path and query params if exist
-    if (normalized.includes('/')) {
-      normalized = normalized.split('/')[0];
-    }
-    
+    normalized = normalized.replace(/^(https?:\/\/)?(www\.)?/i, '');
+    normalized = normalized.split('/')[0]; // Remove any path
     return normalized;
   };
 
-  const fetchDNSRecords = async (domain: string): Promise<DNSRecord[]> => {
-    const normalizedDomain = normalizeDomain(domain);
-    console.log(`Attempting to fetch DNS records for: ${normalizedDomain}`);
-    
-    // Use a public API service that supports CORS
-    try {
-      const response = await fetch(`https://dns.google/resolve?name=${normalizedDomain}&type=A`, {
-        headers: {
-          'Accept': 'application/dns-json',
-        }
-      });
-      
-      if (!response.ok) {
-        console.log(`Google DNS API response not OK: ${response.status}`);
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      console.log("Google DNS API response:", data);
-      
-      if (!data.Answer || data.Answer.length === 0) {
-        // Try ipinfo.io as fallback for A records
-        console.log("No DNS records found, trying ipinfo.io...");
-        const ipinfoResponse = await fetch(`https://ipinfo.io/${normalizedDomain}/json`);
-        if (ipinfoResponse.ok) {
-          const ipData = await ipinfoResponse.json();
-          console.log("ipinfo.io response:", ipData);
-          if (ipData.ip) {
-            return [{
-              type: 'A',
-              name: normalizedDomain,
-              value: ipData.ip,
-              ttl: 300
-            }];
-          }
-        }
-        throw new Error('No DNS records found');
-      }
-      
-      // Transform Google DNS API response to our format
-      return data.Answer.map((record: any) => ({
-        type: record.type === 1 ? 'A' : 
-              record.type === 5 ? 'CNAME' : 
-              record.type === 28 ? 'AAAA' : 
-              record.type === 15 ? 'MX' : 
-              record.type === 16 ? 'TXT' : 
-              record.type === 2 ? 'NS' : 
-              `Type ${record.type}`,
-        name: record.name,
-        value: record.data,
-        ttl: record.TTL
-      }));
-    } catch (error) {
-      console.error("Primary DNS resolution failed:", error);
-      
-      // Try alternative DNS resolver
-      try {
-        console.log("Trying alternative: ipapi.co...");
-        // Try with ipapi.co which supports CORS
-        const ipapiResponse = await fetch(`https://ipapi.co/${normalizedDomain}/json/`);
-        if (ipapiResponse.ok) {
-          const ipData = await ipapiResponse.json();
-          console.log("ipapi.co response:", ipData);
-          if (ipData.ip && !ipData.error) {
-            return [{
-              type: 'A',
-              name: normalizedDomain,
-              value: ipData.ip,
-              ttl: 300
-            }];
-          }
-        }
-        
-        // Try cloudflare DNS over HTTPS
-        console.log("Trying Cloudflare DNS...");
-        const cloudflareResponse = await fetch(`https://cloudflare-dns.com/dns-query?name=${normalizedDomain}&type=A`, {
-          headers: {
-            'Accept': 'application/dns-json'
-          }
-        });
-        
-        if (cloudflareResponse.ok) {
-          const cloudflareData = await cloudflareResponse.json();
-          console.log("Cloudflare DNS response:", cloudflareData);
-          
-          if (cloudflareData.Answer && cloudflareData.Answer.length > 0) {
-            return cloudflareData.Answer.map((record: any) => ({
-              type: record.type === 1 ? 'A' : 
-                    record.type === 5 ? 'CNAME' : 
-                    record.type === 28 ? 'AAAA' : 
-                    record.type === 15 ? 'MX' : 
-                    record.type === 16 ? 'TXT' : 
-                    record.type === 2 ? 'NS' : 
-                    `Type ${record.type}`,
-              name: record.name,
-              value: record.data,
-              ttl: record.TTL
-            }));
-          }
-        }
-        
-        // Try another approach - fetch from public APIs
-        console.log("Trying public-apis.io...");
-        const publicApisResponse = await fetch(`https://api.api-ninjas.com/v1/dnslookup?domain=${normalizedDomain}`, {
-          headers: {
-            'X-Api-Key': 'YOUR_API_KEY'
-          }
-        });
-        
-        if (publicApisResponse.ok) {
-          const dnsData = await publicApisResponse.json();
-          console.log("API Ninjas response:", dnsData);
-          
-          if (Array.isArray(dnsData) && dnsData.length > 0) {
-            return dnsData
-              .filter((record: any) => record && record.record_type && record.value)
-              .map((record: any) => ({
-                type: record.record_type,
-                name: normalizedDomain,
-                value: record.value,
-                ttl: record.ttl || 300
-              }));
-          }
-        }
-      } catch (fallbackError) {
-        console.error("Fallback DNS resolution failed:", fallbackError);
-      }
-      
-      // Final fallback - use ipinfo.io with the domain directly
-      try {
-        console.log("Final fallback with ipinfo.io...");
-        const response = await fetch(`https://ipinfo.io/${encodeURIComponent(normalizedDomain)}/json`);
-        if (response.ok) {
-          const data = await response.json();
-          console.log("Final ipinfo.io response:", data);
-          if (data.ip) {
-            return [{
-              type: 'A',
-              name: normalizedDomain,
-              value: data.ip,
-              ttl: 300
-            }];
-          }
-        }
-      } catch (err) {
-        console.error("All DNS resolution attempts failed");
-      }
-      
-      throw new Error('Unable to fetch DNS records. This could be due to CORS restrictions or the domain not existing.');
-    }
+  const validateDomain = (input: string): boolean => {
+    // Basic domain validation (allows subdomains)
+    const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
+    return domainRegex.test(input);
   };
 
-  const fetchGeoIPData = async (domain: string): Promise<GeoIPData> => {
-    const normalizedDomain = normalizeDomain(domain);
-    console.log(`Attempting to fetch GeoIP data for: ${normalizedDomain}`);
-    
-    // First try to get IP from our DNS records
-    let ip = '';
-    const dnsRecord = dnsRecords.find(record => record.type === 'A');
-    if (dnsRecord) {
-      ip = dnsRecord.value;
-      console.log(`Using IP from DNS records: ${ip}`);
-    } else {
-      // Try to resolve it directly
-      try {
-        console.log("Trying to resolve IP directly from ipinfo.io...");
-        const ipinfoResponse = await fetch(`https://ipinfo.io/${normalizedDomain}/json`);
-        if (ipinfoResponse.ok) {
-          const ipData = await ipinfoResponse.json();
-          console.log("ipinfo.io direct response:", ipData);
-          if (ipData.ip) {
-            ip = ipData.ip;
-          }
-        }
-      } catch (error) {
-        console.error("Error resolving IP:", error);
-      }
-    }
-
-    if (!ip) {
-      // Try to get IP from ipapi
-      try {
-        console.log("Trying to resolve IP from ipapi.co...");
-        const ipapiResponse = await fetch(`https://ipapi.co/${normalizedDomain}/json/`);
-        if (ipapiResponse.ok) {
-          const ipData = await ipapiResponse.json();
-          console.log("ipapi.co direct response:", ipData);
-          if (ipData.ip && !ipData.error) {
-            ip = ipData.ip;
-          }
-        }
-      } catch (error) {
-        console.error("Error resolving IP from ipapi:", error);
-      }
-    }
-
-    if (!ip) {
-      throw new Error('Could not resolve IP address for this domain');
-    }
-
-    // Now use ipinfo.io to get detailed GeoIP data
-    try {
-      console.log(`Fetching detailed GeoIP data for IP: ${ip}`);
-      const response = await fetch(`https://ipinfo.io/${ip}/json`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      const data = await response.json();
-      console.log("GeoIP data from ipinfo.io:", data);
-      return {
-        ip: data.ip,
-        hostname: data.hostname,
-        city: data.city,
-        region: data.region,
-        country: data.country,
-        loc: data.loc,
-        org: data.org,
-        postal: data.postal,
-        timezone: data.timezone
-      };
-    } catch (error) {
-      console.error("Primary GeoIP lookup failed:", error);
-      
-      // Fallback to ipapi.co
-      try {
-        console.log("Trying fallback GeoIP with ipapi.co...");
-        const response = await fetch(`https://ipapi.co/${ip}/json/`);
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.json();
-        console.log("GeoIP data from ipapi.co:", data);
-        
-        if (data.error) {
-          throw new Error(data.reason || 'API error');
-        }
-        
-        return {
-          ip: data.ip,
-          city: data.city,
-          region: data.region_name,
-          country: data.country_name,
-          loc: `${data.latitude},${data.longitude}`,
-          org: data.org,
-          timezone: data.timezone
-        };
-      } catch (fallbackError) {
-        console.error("Fallback GeoIP lookup failed:", fallbackError);
-        throw new Error('Failed to retrieve GeoIP data');
-      }
-    }
-  };
-
-  const generateWHOISLookup = async (domain: string): Promise<string> => {
+  const handleSearch = async () => {
     const normalizedDomain = normalizeDomain(domain);
     
-    // WHOIS lookups cannot be done client-side due to CORS, so we'll explain this
-    return `
-Domain Name: ${normalizedDomain.toUpperCase()}
-
-NOTE: Real WHOIS lookups cannot be performed directly in the browser due to CORS limitations.
-
-To perform an actual WHOIS lookup, you can:
-1. Use a command-line tool like 'whois' on Linux/Mac or online WHOIS services
-2. Visit https://whois.domaintools.com/${normalizedDomain} 
-3. Visit https://www.whois.com/whois/${normalizedDomain}
-
-A WHOIS query provides domain registration information including:
-- Registrar information
-- Domain creation and expiration dates
-- Name servers
-- Registrant contact information (if not private)
-- Administrative and technical contacts
-`;
-  };
-
-  const generatePortScanInfo = (domain: string): PortData[] => {
-    // Port scanning cannot be done client-side, so we'll explain this
-    const commonPorts: PortData[] = [
-      { port: 80, service: 'HTTP', state: 'Browser limits' },
-      { port: 443, service: 'HTTPS', state: 'Browser limits' },
-      { port: 21, service: 'FTP', state: 'Browser limits' },
-      { port: 22, service: 'SSH', state: 'Browser limits' },
-      { port: 25, service: 'SMTP', state: 'Browser limits' }
-    ];
-    
-    return commonPorts;
-  };
-
-  const handleSubmit = async () => {
-    if (!domain) {
-      toast({
-        title: "Domain Required",
-        description: "Please enter a domain to analyze.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
-    const normalizedDomain = normalizeDomain(domain);
-    console.log(`Normalized domain: ${normalizedDomain}`);
-    
-    // Less strict domain validation
-    if (!normalizedDomain.includes('.')) {
+    if (!validateDomain(normalizedDomain)) {
       toast({
         title: "Invalid Domain",
-        description: "Please enter a valid domain name (e.g., example.com).",
+        description: "Please enter a valid domain name (e.g., example.com)",
         variant: "destructive",
       });
+      setError("Invalid domain format. Please enter a valid domain name (e.g., example.com)");
       return;
     }
-    
+
     setIsLoading(true);
-    setDnsRecords([]);
-    setGeoIPData(null);
-    setPortResults([]);
-    setWhoisData('');
     setError(null);
     
+    // Clear previous results based on active tab
+    if (tab === 'dns') setDnsRecords([]);
+    else if (tab === 'geoip') setGeoIpInfo(null);
+    else if (tab === 'whois') setWhoisInfo(null);
+    else if (tab === 'portscan') setPortInfo([]);
+
     try {
-      // Process the selected tab
-      if (activeTab === 'dns' || activeTab === 'geoip') {
-        // DNS lookups are needed for both DNS and GeoIP tabs
-        const records = await fetchDNSRecords(normalizedDomain);
-        setDnsRecords(records);
-        
-        if (activeTab === 'geoip') {
-          try {
-            const geoData = await fetchGeoIPData(normalizedDomain);
-            setGeoIPData(geoData);
-          } catch (geoError) {
-            console.error("GeoIP fetch error:", geoError);
-            setError(geoError instanceof Error ? geoError.message : "Failed to retrieve geolocation data.");
-            toast({
-              title: "GeoIP Lookup Failed",
-              description: geoError instanceof Error ? geoError.message : "Failed to retrieve geolocation data.",
-              variant: "destructive",
-            });
-          }
-        }
-      } else if (activeTab === 'whois') {
-        const whoisInfo = await generateWHOISLookup(normalizedDomain);
-        setWhoisData(whoisInfo);
-      } else if (activeTab === 'portscan') {
-        const portInfo = generatePortScanInfo(normalizedDomain);
-        setPortResults(portInfo);
+      if (tab === 'dns') {
+        await fetchDnsInfo(normalizedDomain);
+      } else if (tab === 'geoip') {
+        await fetchGeoIpInfo(normalizedDomain);
+      } else if (tab === 'whois') {
+        await fetchWhoisInfo(normalizedDomain);
+      } else if (tab === 'portscan') {
+        await simulatePortScan(normalizedDomain);
       }
-      
+    } catch (err) {
+      console.error("Error during reconnaissance:", err);
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+      setError(`Error: ${errorMessage}`);
       toast({
-        title: "Analysis Complete",
-        description: `Reconnaissance data retrieved for ${normalizedDomain}`,
-      });
-    } catch (error) {
-      console.error("Recon error:", error);
-      setError(error instanceof Error ? error.message : "Failed to retrieve reconnaissance data.");
-      toast({
-        title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Failed to retrieve reconnaissance data.",
+        title: "Lookup Failed",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -448,21 +111,285 @@ A WHOIS query provides domain registration information including:
     }
   };
 
+  const fetchDnsInfo = async (domain: string) => {
+    try {
+      // Try primary DNS API
+      const response = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
+      const data = await response.json();
+      
+      if (data.Answer && data.Answer.length > 0) {
+        const records: DnsRecord[] = data.Answer.map((record: any) => ({
+          type: record.type === 1 ? 'A' : record.type === 28 ? 'AAAA' : record.type === 5 ? 'CNAME' : record.type === 2 ? 'NS' : record.type === 15 ? 'MX' : `TYPE${record.type}`,
+          value: record.data,
+          ttl: record.TTL,
+        }));
+        
+        // Also fetch MX and NS records
+        try {
+          const mxResponse = await fetch(`https://dns.google/resolve?name=${domain}&type=MX`);
+          const mxData = await mxResponse.json();
+          if (mxData.Answer && mxData.Answer.length > 0) {
+            const mxRecords: DnsRecord[] = mxData.Answer.map((record: any) => ({
+              type: 'MX',
+              value: record.data,
+              ttl: record.TTL,
+            }));
+            records.push(...mxRecords);
+          }
+        } catch (e) {
+          console.warn("Failed to fetch MX records:", e);
+        }
+        
+        try {
+          const nsResponse = await fetch(`https://dns.google/resolve?name=${domain}&type=NS`);
+          const nsData = await nsResponse.json();
+          if (nsData.Answer && nsData.Answer.length > 0) {
+            const nsRecords: DnsRecord[] = nsData.Answer.map((record: any) => ({
+              type: 'NS',
+              value: record.data,
+              ttl: record.TTL,
+            }));
+            records.push(...nsRecords);
+          }
+        } catch (e) {
+          console.warn("Failed to fetch NS records:", e);
+        }
+        
+        setDnsRecords(records);
+        return;
+      }
+      
+      throw new Error("No DNS records found or API error");
+    } catch (error) {
+      console.warn("Primary DNS API failed, trying fallback:", error);
+      
+      // Fallback to alternative API
+      try {
+        const fallbackResponse = await fetch(`https://api.api-ninjas.com/v1/dnslookup?domain=${domain}`, {
+          headers: {
+            'X-Api-Key': 'YOUR_API_NINJAS_KEY', // Note: In a real implementation, this should be properly secured
+          },
+        });
+        
+        // Basic public DNS lookup without API key
+        const response = await fetch(`https://networkcalc.com/api/dns/lookup/${domain}`);
+        const data = await response.json();
+        
+        if (data && data.status === "OK" && data.records) {
+          const records: DnsRecord[] = [];
+          
+          // Process A records
+          if (data.records.A) {
+            data.records.A.forEach((record: any) => {
+              records.push({
+                type: 'A',
+                value: record.address,
+                ttl: record.ttl,
+              });
+            });
+          }
+          
+          // Process AAAA records
+          if (data.records.AAAA) {
+            data.records.AAAA.forEach((record: any) => {
+              records.push({
+                type: 'AAAA',
+                value: record.address,
+                ttl: record.ttl,
+              });
+            });
+          }
+          
+          // Process CNAME records
+          if (data.records.CNAME) {
+            data.records.CNAME.forEach((record: any) => {
+              records.push({
+                type: 'CNAME',
+                value: record.target,
+                ttl: record.ttl,
+              });
+            });
+          }
+          
+          // Process MX records
+          if (data.records.MX) {
+            data.records.MX.forEach((record: any) => {
+              records.push({
+                type: 'MX',
+                value: `${record.priority} ${record.target}`,
+                ttl: record.ttl,
+              });
+            });
+          }
+          
+          // Process NS records
+          if (data.records.NS) {
+            data.records.NS.forEach((record: any) => {
+              records.push({
+                type: 'NS',
+                value: record.target,
+                ttl: record.ttl,
+              });
+            });
+          }
+          
+          if (records.length > 0) {
+            setDnsRecords(records);
+            return;
+          }
+        }
+        
+        // Last resort fallback: Try to at least resolve the IP address
+        try {
+          const ipResponse = await fetch(`https://api.ipify.org?format=json`);
+          const ipData = await ipResponse.json();
+          
+          setDnsRecords([
+            {
+              type: 'A',
+              value: `Lookup limited in browser. Use a dedicated DNS tool for complete results.`,
+            }
+          ]);
+        } catch (e) {
+          throw new Error("All DNS lookup methods failed. Try a different domain or use a dedicated tool.");
+        }
+      } catch (fallbackError) {
+        console.error("All DNS lookup attempts failed:", fallbackError);
+        throw new Error("Failed to retrieve DNS records. Try a different domain or use a dedicated tool.");
+      }
+    }
+  };
+
+  const fetchGeoIpInfo = async (domain: string) => {
+    try {
+      // First, try to resolve the domain to an IP if it's not already an IP
+      let ip = domain;
+      if (!domain.match(/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/)) {
+        try {
+          // Try to resolve domain to IP first
+          const dnsResponse = await fetch(`https://dns.google/resolve?name=${domain}&type=A`);
+          const dnsData = await dnsResponse.json();
+          
+          if (dnsData.Answer && dnsData.Answer.length > 0) {
+            const aRecord = dnsData.Answer.find((record: any) => record.type === 1); // Type 1 is A record
+            if (aRecord) {
+              ip = aRecord.data;
+            }
+          } else {
+            throw new Error("Could not resolve domain to IP address");
+          }
+        } catch (e) {
+          console.warn("DNS resolution failed:", e);
+          // Try alternative method to get IP
+          try {
+            const altDnsResponse = await fetch(`https://networkcalc.com/api/dns/lookup/${domain}`);
+            const altDnsData = await altDnsResponse.json();
+            
+            if (altDnsData && altDnsData.status === "OK" && altDnsData.records && altDnsData.records.A && altDnsData.records.A.length > 0) {
+              ip = altDnsData.records.A[0].address;
+            } else {
+              throw new Error("Could not resolve domain to IP address");
+            }
+          } catch (altError) {
+            throw new Error("Could not resolve domain to IP address. Try entering an IP directly.");
+          }
+        }
+      }
+      
+      // Now that we have an IP (or the original domain was an IP), fetch GeoIP info
+      const response = await fetch(`https://ipinfo.io/${ip}/json`);
+      const data = await response.json();
+      
+      if (data && !data.error) {
+        setGeoIpInfo({
+          ip: data.ip,
+          country: data.country,
+          city: data.city,
+          region: data.region,
+          loc: data.loc,
+          org: data.org,
+          timezone: data.timezone,
+        });
+      } else {
+        // Fallback to alternative API
+        try {
+          const fallbackResponse = await fetch(`https://ipapi.co/${ip}/json/`);
+          const fallbackData = await fallbackResponse.json();
+          
+          if (fallbackData && !fallbackData.error) {
+            setGeoIpInfo({
+              ip: fallbackData.ip,
+              country: fallbackData.country_name,
+              city: fallbackData.city,
+              region: fallbackData.region,
+              loc: `${fallbackData.latitude},${fallbackData.longitude}`,
+              org: fallbackData.org || fallbackData.asn,
+              timezone: fallbackData.timezone,
+            });
+          } else {
+            throw new Error("Could not retrieve geolocation information for this IP");
+          }
+        } catch (fallbackError) {
+          throw new Error("All GeoIP lookups failed. Try a different domain or IP.");
+        }
+      }
+    } catch (error) {
+      console.error("GeoIP lookup failed:", error);
+      throw error;
+    }
+  };
+
+  const fetchWhoisInfo = async (domain: string) => {
+    // WHOIS is difficult to implement in the browser due to CORS restrictions
+    // and the lack of official APIs. In a real implementation, this would require a server-side component.
+    try {
+      // Simulate a WHOIS lookup with limited browser capabilities
+      setWhoisInfo({
+        domain: domain,
+        registrar: "Browser-based WHOIS lookups are limited due to CORS restrictions",
+        nameservers: ["Use a dedicated WHOIS tool or command line utility for complete information"]
+      });
+      
+      // We'll show a message to the user about the limitation
+      setError("Browser-based WHOIS lookups are limited due to CORS restrictions. For complete WHOIS information, use a dedicated tool or command line utility.");
+    } catch (error) {
+      console.error("WHOIS lookup failed:", error);
+      throw new Error("WHOIS lookup failed. Browser-based WHOIS queries are limited due to CORS restrictions.");
+    }
+  };
+
+  const simulatePortScan = async (domain: string) => {
+    // Port scanning from a browser is impossible due to security restrictions
+    // This is a simulation to show what the feature would do in a real security tool
+    try {
+      setPortInfo([
+        {
+          port: 80,
+          service: "HTTP",
+          status: "open",
+        },
+        {
+          port: 443,
+          service: "HTTPS",
+          status: "open",
+        }
+      ]);
+      
+      // Explain the limitation to the user
+      setError("Browser-based port scanning is not possible due to security restrictions. This is a simulated result showing common web ports. For actual port scanning, use a dedicated network tool like Nmap.");
+    } catch (error) {
+      console.error("Port scan simulation failed:", error);
+      throw new Error("Port scanning from a browser is not possible due to security restrictions.");
+    }
+  };
+
   const handleReset = () => {
     setDomain('');
     setDnsRecords([]);
-    setGeoIPData(null);
-    setPortResults([]);
-    setWhoisData('');
+    setGeoIpInfo(null);
+    setWhoisInfo(null);
+    setPortInfo([]);
     setError(null);
-  };
-
-  const handleCopy = (content: string) => {
-    navigator.clipboard.writeText(content);
-    toast({
-      title: "Copied to clipboard",
-      description: "The data has been copied to your clipboard.",
-    });
   };
 
   return (
@@ -470,7 +397,7 @@ A WHOIS query provides domain registration information including:
       <div className="cyber-panel p-6">
         <div className="flex items-center mb-6">
           <Search className="mr-2 h-6 w-6 text-cyber-blue" />
-          <h2 className="text-xl font-bold flex-1">Network Reconnaissance</h2>
+          <h2 className="text-xl font-bold flex-1">Reconnaissance</h2>
           <Button
             variant="outline"
             size="sm"
@@ -486,18 +413,18 @@ A WHOIS query provides domain registration information including:
           {/* Domain input */}
           <div className="w-full">
             <Label htmlFor="domain" className="text-sm mb-2 block text-gray-300">
-              Target Domain
+              Domain or IP Address
             </Label>
             <div className="flex gap-2">
               <Input
                 id="domain"
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                placeholder="example.com"
+                placeholder="Enter domain name or IP (e.g., example.com)"
                 className="font-mono flex-1"
               />
               <Button 
-                onClick={handleSubmit} 
+                onClick={handleSearch} 
                 disabled={isLoading}
                 className="bg-cyber-blue hover:bg-cyber-blue/80"
               >
@@ -506,247 +433,277 @@ A WHOIS query provides domain registration information including:
                 ) : (
                   <>
                     <Search className="mr-1 h-4 w-4" />
-                    Analyze
+                    Search
                   </>
                 )}
               </Button>
             </div>
-            <p className="text-xs text-gray-400 mt-1">
-              Enter a domain name to perform reconnaissance (e.g., example.com, google.com)
-            </p>
           </div>
 
-          {/* Error display */}
-          {error && (
-            <div className="w-full bg-red-900/30 border border-red-500/50 rounded-md p-3">
-              <p className="text-red-400 text-sm">{error}</p>
-            </div>
-          )}
-
-          {/* Tabs for different recon types */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="w-full grid grid-cols-4 mb-6">
-              <TabsTrigger value="dns">DNS</TabsTrigger>
-              <TabsTrigger value="geoip">GeoIP</TabsTrigger>
-              <TabsTrigger value="whois">WHOIS</TabsTrigger>
-              <TabsTrigger value="portscan">Port Scan</TabsTrigger>
+          {/* Tabs */}
+          <Tabs value={tab} onValueChange={setTab} className="w-full">
+            <TabsList className="w-full grid grid-cols-4 mb-4">
+              <TabsTrigger value="dns" className="text-xs md:text-sm">
+                <Globe className="h-3 w-3 mr-1" />
+                DNS
+              </TabsTrigger>
+              <TabsTrigger value="geoip" className="text-xs md:text-sm">
+                <Globe className="h-3 w-3 mr-1" />
+                GeoIP
+              </TabsTrigger>
+              <TabsTrigger value="whois" className="text-xs md:text-sm">
+                <Server className="h-3 w-3 mr-1" />
+                WHOIS
+              </TabsTrigger>
+              <TabsTrigger value="portscan" className="text-xs md:text-sm">
+                <Activity className="h-3 w-3 mr-1" />
+                Port Scan
+              </TabsTrigger>
             </TabsList>
-            
-            {/* DNS Records Tab */}
-            <TabsContent value="dns" className="space-y-4">
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    DNS Records
-                  </Label>
-                  {dnsRecords.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(JSON.stringify(dnsRecords, null, 2))}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      Copy
-                    </Button>
-                  )}
-                </div>
-                <div className="bg-cyber-darker border border-cyber-dark p-4 rounded-md min-h-[200px]">
-                  {dnsRecords.length > 0 ? (
-                    <div className="space-y-2">
-                      {dnsRecords.map((record, index) => (
-                        <div key={index} className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="flex justify-between">
-                            <span className="text-cyber-blue">{record.type}</span>
-                            <span className="text-gray-400 text-sm">TTL: {record.ttl || 'N/A'}</span>
-                          </div>
-                          <div className="mt-1">
-                            <span className="text-sm text-gray-300">{record.name}</span>
-                          </div>
-                          <div className="mt-1 font-mono text-sm break-all">
-                            {record.value}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      {isLoading ? "Fetching DNS records..." : "DNS records will appear here after analysis"}
-                    </div>
-                  )}
-                </div>
-                <p className="text-xs text-gray-400 mt-2">
-                  Note: Some DNS record types may not be available due to browser API limitations
-                </p>
-              </div>
-            </TabsContent>
-            
-            {/* GeoIP Tab */}
-            <TabsContent value="geoip" className="space-y-4">
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Geolocation Data
-                  </Label>
-                  {geoIPData && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(JSON.stringify(geoIPData, null, 2))}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      Copy
-                    </Button>
-                  )}
-                </div>
-                <div className="bg-cyber-darker border border-cyber-dark p-4 rounded-md min-h-[200px]">
-                  {geoIPData ? (
-                    <div className="space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">IP Address</div>
-                          <div className="font-mono">{geoIPData.ip}</div>
-                        </div>
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">Hostname</div>
-                          <div className="font-mono text-sm break-all">{geoIPData.hostname || 'N/A'}</div>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">City</div>
-                          <div>{geoIPData.city || 'N/A'}</div>
-                        </div>
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">Region</div>
-                          <div>{geoIPData.region || 'N/A'}</div>
-                        </div>
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">Country</div>
-                          <div>{geoIPData.country || 'N/A'}</div>
-                        </div>
-                      </div>
-                      <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                        <div className="text-xs text-gray-400">Organization</div>
-                        <div className="text-sm break-all">{geoIPData.org || 'N/A'}</div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">Timezone</div>
-                          <div>{geoIPData.timezone || 'N/A'}</div>
-                        </div>
-                        <div className="p-2 border border-cyber-dark/50 rounded bg-black/20">
-                          <div className="text-xs text-gray-400">Coordinates</div>
-                          <div className="font-mono text-sm">{geoIPData.loc || 'N/A'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      {isLoading ? "Fetching geolocation data..." : "Geolocation data will appear here after analysis"}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-            
-            {/* WHOIS Tab */}
-            <TabsContent value="whois" className="space-y-4">
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    WHOIS Information
-                  </Label>
-                  {whoisData && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(whoisData)}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      Copy
-                    </Button>
-                  )}
-                </div>
-                <div className="bg-cyber-darker border border-cyber-dark p-4 rounded-md min-h-[200px]">
-                  {whoisData ? (
-                    <pre className="text-sm text-gray-300 whitespace-pre-wrap">
-                      {whoisData}
-                    </pre>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      {isLoading ? "Fetching WHOIS data..." : "WHOIS information will appear here after analysis"}
-                    </div>
-                  )}
-                </div>
-                <div className="mt-4 p-3 border border-yellow-600/30 bg-yellow-900/20 rounded-md">
-                  <Server className="h-5 w-5 text-yellow-400 float-left mr-2" />
-                  <p className="text-sm text-yellow-300">
-                    Browser Limitation: Real WHOIS queries cannot be performed directly in the browser.
-                    Consider using one of the recommended external services mentioned above.
-                  </p>
-                </div>
-              </div>
-            </TabsContent>
-            
-            {/* Port Scan Tab */}
-            <TabsContent value="portscan" className="space-y-4">
-              <div className="w-full">
-                <div className="flex justify-between items-center mb-2">
-                  <Label className="text-sm text-gray-300">
-                    Common Ports
-                  </Label>
-                  {portResults.length > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleCopy(JSON.stringify(portResults, null, 2))}
-                      className="h-6 px-2 text-xs"
-                    >
-                      <Copy className="mr-1 h-3 w-3" />
-                      Copy
-                    </Button>
-                  )}
-                </div>
-                <div className="bg-cyber-darker border border-cyber-dark p-4 rounded-md min-h-[200px]">
-                  {portResults.length > 0 ? (
+
+            {/* Error display */}
+            {error && (
+              <Alert variant="destructive" className="mb-4 bg-amber-950 border-amber-800 text-amber-200">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Note</AlertTitle>
+                <AlertDescription>
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* DNS Lookup */}
+            <TabsContent value="dns" className="mt-0">
+              <div className="bg-cyber-darker p-4 rounded-md min-h-[300px]">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center h-[300px]">
+                    <div className="animate-spin h-8 w-8 border-2 border-cyber-blue border-opacity-50 border-t-cyber-blue rounded-full mb-4" />
+                    <p className="text-cyber-blue">Looking up DNS records...</p>
+                  </div>
+                ) : dnsRecords.length > 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-cyber-blue">DNS Records for {domain}</h3>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
+                      <table className="w-full">
                         <thead>
-                          <tr className="border-b border-cyber-dark">
-                            <th className="text-left py-2 px-3 text-gray-400">Port</th>
-                            <th className="text-left py-2 px-3 text-gray-400">Service</th>
-                            <th className="text-left py-2 px-3 text-gray-400">Status</th>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">Type</th>
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">Value</th>
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">TTL</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {portResults.map((port, index) => (
-                            <tr key={index} className="border-b border-cyber-dark/30">
-                              <td className="py-2 px-3 font-mono">{port.port}</td>
-                              <td className="py-2 px-3">{port.service}</td>
-                              <td className="py-2 px-3">
-                                <span className="text-yellow-400">{port.state}</span>
+                          {dnsRecords.map((record, index) => (
+                            <tr key={index} className="border-b border-gray-800">
+                              <td className="py-2 px-2 font-mono text-cyber-green">{record.type}</td>
+                              <td className="py-2 px-2 font-mono break-all">{record.value}</td>
+                              <td className="py-2 px-2 font-mono text-gray-400">{record.ttl || '-'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                    <Globe className="h-12 w-12 mb-4 opacity-20" />
+                    <p>Enter a domain and click Search to look up DNS records</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* GeoIP Lookup */}
+            <TabsContent value="geoip" className="mt-0">
+              <div className="bg-cyber-darker p-4 rounded-md min-h-[300px]">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center h-[300px]">
+                    <div className="animate-spin h-8 w-8 border-2 border-cyber-blue border-opacity-50 border-t-cyber-blue rounded-full mb-4" />
+                    <p className="text-cyber-blue">Looking up geolocation data...</p>
+                  </div>
+                ) : geoIpInfo ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-cyber-blue">Geolocation for {domain}</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">IP Address</p>
+                        <p className="font-mono">{geoIpInfo.ip}</p>
+                      </div>
+                      
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">Country</p>
+                        <p className="font-mono">{geoIpInfo.country || 'Unknown'}</p>
+                      </div>
+                      
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">City / Region</p>
+                        <p className="font-mono">{(geoIpInfo.city && geoIpInfo.region) 
+                          ? `${geoIpInfo.city}, ${geoIpInfo.region}` 
+                          : (geoIpInfo.city || geoIpInfo.region || 'Unknown')}</p>
+                      </div>
+                      
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">Coordinates</p>
+                        <p className="font-mono">{geoIpInfo.loc || 'Unknown'}</p>
+                      </div>
+                      
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">Organization</p>
+                        <p className="font-mono">{geoIpInfo.org || 'Unknown'}</p>
+                      </div>
+                      
+                      <div className="bg-cyber-dark/50 p-3 rounded">
+                        <p className="text-gray-400 text-sm">Timezone</p>
+                        <p className="font-mono">{geoIpInfo.timezone || 'Unknown'}</p>
+                      </div>
+                    </div>
+                    
+                    {geoIpInfo.loc && (
+                      <div className="flex justify-center mt-4">
+                        <Button variant="outline" size="sm" className="text-xs" onClick={() => {
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${geoIpInfo.loc}`, '_blank');
+                        }}>
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          View on Map
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                    <Globe className="h-12 w-12 mb-4 opacity-20" />
+                    <p>Enter a domain or IP and click Search to lookup geolocation</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* WHOIS Lookup */}
+            <TabsContent value="whois" className="mt-0">
+              <div className="bg-cyber-darker p-4 rounded-md min-h-[300px]">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center h-[300px]">
+                    <div className="animate-spin h-8 w-8 border-2 border-cyber-blue border-opacity-50 border-t-cyber-blue rounded-full mb-4" />
+                    <p className="text-cyber-blue">Looking up WHOIS data...</p>
+                  </div>
+                ) : whoisInfo ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-cyber-blue">WHOIS for {domain}</h3>
+                    <Alert variant="default" className="bg-blue-950 border-blue-800 text-blue-200">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Full WHOIS lookup requires server-side processing due to browser security restrictions.
+                        For detailed WHOIS data, use the whois command in a terminal or a dedicated WHOIS service.
+                      </AlertDescription>
+                    </Alert>
+                    
+                    <div className="bg-cyber-dark/50 p-4 rounded font-mono text-sm whitespace-pre-wrap">
+                      <p>Domain: {whoisInfo.domain}</p>
+                      {whoisInfo.registrar && <p>Registrar: {whoisInfo.registrar}</p>}
+                      {whoisInfo.createdDate && <p>Created: {whoisInfo.createdDate}</p>}
+                      {whoisInfo.updatedDate && <p>Updated: {whoisInfo.updatedDate}</p>}
+                      {whoisInfo.expiresDate && <p>Expires: {whoisInfo.expiresDate}</p>}
+                      
+                      {whoisInfo.nameservers && whoisInfo.nameservers.length > 0 && (
+                        <>
+                          <p className="mt-2">Nameservers:</p>
+                          <ul className="list-disc pl-5">
+                            {whoisInfo.nameservers.map((ns, index) => (
+                              <li key={index}>{ns}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                      
+                      {whoisInfo.status && whoisInfo.status.length > 0 && (
+                        <>
+                          <p className="mt-2">Status:</p>
+                          <ul className="list-disc pl-5">
+                            {whoisInfo.status.map((status, index) => (
+                              <li key={index}>{status}</li>
+                            ))}
+                          </ul>
+                        </>
+                      )}
+                    </div>
+                    
+                    <div className="flex justify-center mt-4">
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => {
+                        window.open(`https://www.whois.com/whois/${domain}`, '_blank');
+                      }}>
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        View on WHOIS.com
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                    <Server className="h-12 w-12 mb-4 opacity-20" />
+                    <p>Enter a domain and click Search to look up WHOIS information</p>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
+            {/* Port Scan */}
+            <TabsContent value="portscan" className="mt-0">
+              <div className="bg-cyber-darker p-4 rounded-md min-h-[300px]">
+                {isLoading ? (
+                  <div className="flex flex-col items-center justify-center h-[300px]">
+                    <div className="animate-spin h-8 w-8 border-2 border-cyber-blue border-opacity-50 border-t-cyber-blue rounded-full mb-4" />
+                    <p className="text-cyber-blue">Scanning ports...</p>
+                  </div>
+                ) : portInfo.length > 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium text-cyber-blue">Port Scan for {domain}</h3>
+                    <Alert variant="default" className="bg-blue-950 border-blue-800 text-blue-200">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Browser-based port scanning is not possible due to security restrictions.
+                        Only common web ports are shown. Use Nmap or a similar tool for actual port scanning.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-700">
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">Port</th>
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">Service</th>
+                            <th className="text-left py-2 px-2 text-gray-400 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {portInfo.map((info, index) => (
+                            <tr key={index} className="border-b border-gray-800">
+                              <td className="py-2 px-2 font-mono">{info.port}</td>
+                              <td className="py-2 px-2 font-mono">{info.service}</td>
+                              <td className={`py-2 px-2 font-mono ${
+                                info.status === 'open' ? 'text-green-400' : 
+                                info.status === 'closed' ? 'text-red-400' : 'text-yellow-400'
+                              }`}>
+                                {info.status}
                               </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center h-full text-gray-400">
-                      {isLoading ? "Checking ports..." : "Port information will appear here after analysis"}
+                    
+                    <div className="flex justify-center mt-4">
+                      <Button variant="outline" size="sm" className="text-xs" onClick={() => {
+                        window.open(`https://www.shodan.io/host/${geoIpInfo?.ip || domain}`, '_blank');
+                      }}>
+                        <ExternalLink className="h-3 w-3 mr-1" />
+                        Check on Shodan
+                      </Button>
                     </div>
-                  )}
-                </div>
-                <div className="mt-4 p-3 border border-yellow-600/30 bg-yellow-900/20 rounded-md">
-                  <Server className="h-5 w-5 text-yellow-400 float-left mr-2" />
-                  <p className="text-sm text-yellow-300">
-                    Browser Limitation: Real port scanning cannot be performed in the browser due to security restrictions.
-                    For actual port scanning, use dedicated tools like Nmap or online port scanning services.
-                  </p>
-                </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-[300px] text-gray-400">
+                    <Activity className="h-12 w-12 mb-4 opacity-20" />
+                    <p>Enter a domain and click Search to scan common ports</p>
+                  </div>
+                )}
               </div>
             </TabsContent>
           </Tabs>
