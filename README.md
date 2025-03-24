@@ -57,7 +57,7 @@ To run this project locally:
 
 2. **Navigate into the project directory**:
     ```bash
-    cd ctf-toolkit
+    cd ctf-web
     ```
 
 3. **Install dependencies**:
