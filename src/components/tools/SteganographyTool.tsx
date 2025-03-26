@@ -421,11 +421,11 @@ const SteganographyTool: React.FC = () => {
           }
           
           // Generate mock file structure based on file name
-          const mockFiles = generateMockFileStructure(file.name);
-          setExtractedFiles(mockFiles);
+          const mockFiles = generateMockFileStructure(file.name);\
+          setExtractedFiles(mockFiles);\
           
-          toast({
-            title: "Extraction Complete",
+          toast({\
+            title: "Extraction Complete",\
             description: `Successfully extracted ${countFiles(mockFiles)} files from the archive.`,
           });
         }, 1000);
