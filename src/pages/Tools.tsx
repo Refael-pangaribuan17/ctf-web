@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces, KeyRound, Bug, Search, ChevronLeft } from 'lucide-react';
+import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces, KeyRound, Bug, Search, ChevronLeft, FileArchive } from 'lucide-react';
 import { LucideIcon } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import ToolCard from '@/components/ToolCard';
@@ -115,8 +115,8 @@ const Tools = () => {
     },
     {
       id: 'steg',
-      title: 'Steganography Detector',
-      description: 'Analyze images for hidden steganographic content',
+      title: 'Advanced Steganography',
+      description: 'Detect, extract and hide data in images, audio, and archives',
       icon: Image,
       component: SteganographyTool,
       category: 'forensics'
@@ -168,6 +168,14 @@ const Tools = () => {
       icon: Search,
       component: ReconTool,
       category: 'network'
+    },
+    {
+      id: 'archive',
+      title: 'Archive Analyzer',
+      description: 'Extract and analyze contents of ZIP, RAR, and other archive formats',
+      icon: FileArchive,
+      component: SteganographyTool,
+      category: 'forensics'
     }
   ];
 
