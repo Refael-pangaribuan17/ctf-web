@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -706,8 +707,8 @@ const SteganographyTool: React.FC = () => {
       },
       {
         technique: "Temporal Steganography",
-        findings: "Possible data hidden in frame transitions.",
-        confidence: "Medium (59%)"
+        confidence: "Medium (59%)",
+        findings: "Possible data hidden in frame transitions."
       }
     ];
   };
@@ -922,6 +923,63 @@ const SteganographyTool: React.FC = () => {
         ],
         toolsSuggested: ["StegSolve", "zsteg", "steghide", "OpenStego"]
       };
+    } else if (technique.includes('spectro') || technique.includes('audio')) {
+      return {
+        technique: "Audio Steganography",
+        fileType: fileType,
+        fileName: fileName,
+        steps: [
+          "Extract the audio file from the archive.",
+          "Analyze the spectrogram using Sonic Visualiser or Audacity.",
+          "Look for patterns, text, or images in the frequency spectrum.",
+          "Check both high and low frequency ranges.",
+          "Try extracting with specialized audio steg tools."
+        ],
+        commands: [
+          `sonic-visualiser ${fileName}`,
+          `audacity ${fileName}`,
+          `steghide extract -sf ${fileName}`
+        ],
+        toolsSuggested: ["Sonic Visualiser", "Audacity", "WavSteg", "DeepSound"]
+      };
+    } else if (technique.includes('whitespace') || technique.includes('text')) {
+      return {
+        technique: "Text Steganography",
+        fileType: fileType,
+        fileName: fileName,
+        steps: [
+          "Open the file in a hex editor to view invisible characters.",
+          "Check for trailing whitespace at end of lines.",
+          "Look for patterns of spaces and tabs that could encode binary data.",
+          "Try online text steganography decoders.",
+          "Check for zero-width characters that might hide data."
+        ],
+        commands: [
+          `xxd ${fileName}`,
+          `hexdump -C ${fileName}`,
+          `cat ${fileName} | tr -d '\\n' | od -c`
+        ],
+        toolsSuggested: ["Hex Editors", "StegSnow", "Unicode Steganography Tools"]
+      };
+    } else if (technique.includes('flag') || technique.includes('direct')) {
+      return {
+        technique: "Flag Extraction",
+        fileType: fileType,
+        fileName: fileName,
+        steps: [
+          "Open the file directly to view its contents.",
+          "Look for text formatted like a flag (e.g., flag{...}, CTF{...}).",
+          "Check for Base64 or hex encoded strings that might need decoding.",
+          "If the file is a binary, use strings command to extract text.",
+          "Check for obfuscated flag formats that might need processing."
+        ],
+        commands: [
+          `cat ${fileName}`,
+          `strings ${fileName} | grep -i flag`,
+          `strings ${fileName} | grep -i ctf`
+        ],
+        toolsSuggested: ["Text Editor", "Hex Editor", "CyberChef"]
+      };
     }
     
     return null;
@@ -968,6 +1026,13 @@ const SteganographyTool: React.FC = () => {
           title: "Archive Extraction Complete",
           description: "The archive has been successfully extracted.",
         });
+        
+        // Auto-analyze the extracted files if auto-detect is enabled
+        if (autoDetectMode) {
+          setTimeout(() => {
+            autoAnalyzeExtractedFiles();
+          }, 1000);
+        }
       }
     }, interval);
   };
@@ -1087,7 +1152,7 @@ const SteganographyTool: React.FC = () => {
           type: 'file',
           path: `${baseStructure.path}/file${i+1}${ext}`,
           fileType: fileType,
-          fileSize: `${(size / 1000).toFixed(1)} MB`
+          fileSize: `${(size / 1000).toFixed(1)} KB`
         });
       }
       
@@ -1158,6 +1223,13 @@ const SteganographyTool: React.FC = () => {
             title: "Archive Extraction Complete",
             description: "The password-protected archive has been successfully extracted.",
           });
+          
+          // Auto-analyze the extracted files if auto-detect is enabled
+          if (autoDetectMode) {
+            setTimeout(() => {
+              autoAnalyzeExtractedFiles();
+            }, 1000);
+          }
         }
       }, interval);
     }, 1500);
@@ -1166,81 +1238,349 @@ const SteganographyTool: React.FC = () => {
   return (
     <div className="space-y-4">
       <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-        <Image className="h-5 w-5 text-cyber-blue" />
-        <span>Advanced Steganography Tool</span>
+        <Fingerprint className="h-5 w-5 text-cyber-blue" />
+        <span>Automatic Steganography Analyzer</span>
       </h2>
       
-      <div className="flex justify-between items-center">
-        <div className="flex items-center">
-          <Archive className="h-4 w-4 mr-2 text-gray-400" />
-          <span className="text-sm font-medium">Extracted Files</span>
+      <Alert className="bg-cyan-950/30 border-cyan-500/30">
+        <Search className="h-4 w-4 text-cyan-500" />
+        <AlertTitle>Intelligent Steganography Detection</AlertTitle>
+        <AlertDescription>
+          Upload any file for automatic analysis. The system will detect hidden data using multiple steganography techniques without requiring manual method selection.
+        </AlertDescription>
+      </Alert>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <div className="mb-4">
+            <div className="flex items-center mb-2">
+              <Upload className="h-4 w-4 mr-2 text-gray-400" />
+              <span className="text-sm font-medium">Upload Files for Analysis</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full flex items-center justify-center gap-2"
+                variant="outline"
+              >
+                <Image className="h-4 w-4" />
+                <span>Images</span>
+                <input 
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={(e) => handleFileChange(e, 'image')}
+                />
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'audio/*';
+                  input.onchange = (e) => handleFileChange(e as any, 'audio');
+                  input.click();
+                }}
+                className="w-full flex items-center justify-center gap-2"
+                variant="outline"
+              >
+                <FileAudio className="h-4 w-4" />
+                <span>Audio</span>
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = 'video/*';
+                  input.onchange = (e) => handleFileChange(e as any, 'video');
+                  input.click();
+                }}
+                className="w-full flex items-center justify-center gap-2"
+                variant="outline"
+              >
+                <FileVideo className="h-4 w-4" />
+                <span>Video</span>
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.txt,.pdf,.doc,.docx,.rtf,.md,.html,.xml,.json';
+                  input.onchange = (e) => handleFileChange(e as any, 'text');
+                  input.click();
+                }}
+                className="w-full flex items-center justify-center gap-2"
+                variant="outline"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Text</span>
+              </Button>
+              
+              <Button
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.zip,.rar,.7z,.tar,.gz,.tgz,.bz2,.tbz2';
+                  input.onchange = (e) => handleFileChange(e as any, 'archive');
+                  input.click();
+                }}
+                className="w-full flex items-center justify-center gap-2 col-span-full"
+                variant="outline"
+              >
+                <Archive className="h-4 w-4" />
+                <span>Archive (ZIP, RAR, 7z, etc.)</span>
+              </Button>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <ZapIcon className="h-4 w-4 mr-2 text-amber-500" />
+                <span className="text-sm font-medium">Auto Detection Mode</span>
+              </div>
+              <Checkbox 
+                id="auto-detect" 
+                checked={autoDetectMode}
+                onCheckedChange={(checked) => setAutoDetectMode(checked as boolean)}
+              />
+            </div>
+            
+            {isExtracting && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span>Extracting archive...</span>
+                  <span>{extractionProgress}%</span>
+                </div>
+                <Progress value={extractionProgress} className="h-2" />
+              </div>
+            )}
+            
+            {isArchiveEncrypted && showArchivePassword && (
+              <div className="space-y-2 bg-gray-900/50 p-3 rounded-md">
+                <Label htmlFor="password" className="text-xs flex items-center">
+                  <Lock className="h-3 w-3 mr-1 text-amber-500" />
+                  <span>Archive Password</span>
+                </Label>
+                <div className="flex gap-2">
+                  <Input 
+                    id="password"
+                    type="password"
+                    value={archivePassword}
+                    onChange={(e) => setArchivePassword(e.target.value)}
+                    placeholder="Enter password"
+                    className="text-xs h-8"
+                  />
+                  <Button size="sm" className="h-8" onClick={processPasswordProtectedArchive}>
+                    Unlock
+                  </Button>
+                </div>
+                {archiveExtractionError && (
+                  <div className="text-xs text-red-500">{archiveExtractionError}</div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          {extractedFiles.length > 0 && (
+            <div className="mt-4">
+              <FileTree 
+                files={extractedFiles} 
+                onSelectFiles={setSelectedExtractedFiles} 
+              />
+              <div className="mt-2 flex justify-between">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs"
+                  onClick={autoAnalyzeExtractedFiles}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <>Analyzing...</>
+                  ) : (
+                    <>
+                      <Search className="h-3 w-3 mr-1" />
+                      Analyze All Files
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="flex gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 text-xs px-2 py-0"
-            onClick={() => {
-              const allExpanded: Record<string, boolean> = {};
-              const expandAll = (nodes: FileNode[]) => {
-                nodes.forEach(node => {
-                  if (node.type === 'directory') {
-                    allExpanded[node.path] = true;
-                    if (node.children) expandAll(node.children);
-                  }
-                });
-              };
-              expandAll(extractedFiles);
-            }}
-          >
-            Expand All
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 text-xs px-2 py-0"
-            onClick={() => {
-              setExpanded({});
-            }}
-          >
-            Collapse All
-          </Button>
+        
+        <div>
+          {isProcessing && (
+            <div className="flex flex-col items-center justify-center h-40 space-y-3">
+              <div className="animate-spin">
+                <Search className="h-6 w-6 text-cyber-blue" />
+              </div>
+              <div className="text-sm text-center text-gray-400">
+                {analysisInProgress ? 'Analyzing for hidden data...' : 'Processing...'}
+              </div>
+            </div>
+          )}
+          
+          {!isProcessing && detectionResult && (
+            <Card className="bg-cyber-dark/20 border-cyber-blue/30">
+              <CardContent className="pt-6">
+                {detectionResult.type === 'comprehensive-analysis' && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-md font-bold">{detectionResult.fileName}</h3>
+                        <div className="text-xs text-gray-400">
+                          {detectionResult.fileType.toUpperCase()} • {detectionResult.fileSize}
+                        </div>
+                      </div>
+                      <div className="bg-cyber-blue/20 px-2 py-1 rounded text-xs">
+                        {detectionResult.confidence}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium flex items-center">
+                        <Fingerprint className="h-4 w-4 mr-1 text-cyber-blue" />
+                        <span>Detection Results</span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        {detectionResult.techniques.map((technique: any, index: number) => (
+                          <div 
+                            key={index} 
+                            className={`text-xs p-2 rounded-md ${
+                              technique.confidence?.includes('High') 
+                                ? 'bg-green-900/20 border border-green-500/30' 
+                                : technique.confidence?.includes('Medium')
+                                ? 'bg-amber-900/20 border border-amber-500/30'
+                                : 'bg-gray-900/20 border border-gray-500/30'
+                            }`}
+                          >
+                            <div className="flex justify-between">
+                              <span className="font-medium">{technique.technique}</span>
+                              <span>{technique.confidence}</span>
+                            </div>
+                            <div className="mt-1 text-gray-400">{technique.findings}</div>
+                            {technique.hiddenDataSize && (
+                              <div className="mt-1 text-gray-400">Size: {technique.hiddenDataSize}</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {detectionResult.type === 'archive-analysis' && (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-md font-bold">Archive Analysis Results</h3>
+                      <div className="text-xs text-gray-400">
+                        {detectionResult.analysisOverview.totalFiles} files scanned • {detectionResult.analysisOverview.suspiciousFiles} suspicious files
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-2 text-center">
+                      <div className="bg-gray-900/30 p-2 rounded-md">
+                        <div className="text-lg font-bold text-cyber-blue">{detectionResult.analysisOverview.highConfidenceCount}</div>
+                        <div className="text-xs">High Confidence</div>
+                      </div>
+                      <div className="bg-gray-900/30 p-2 rounded-md">
+                        <div className="text-lg font-bold text-amber-500">{detectionResult.analysisOverview.mediumConfidenceCount}</div>
+                        <div className="text-xs">Medium Confidence</div>
+                      </div>
+                      <div className="bg-gray-900/30 p-2 rounded-md">
+                        <div className="text-lg font-bold text-gray-400">{detectionResult.analysisOverview.techniques.length}</div>
+                        <div className="text-xs">Techniques Found</div>
+                      </div>
+                    </div>
+                    
+                    {detectionResult.analysisOverview.mostSuspiciousFile && (
+                      <div className="bg-red-900/20 border border-red-500/30 p-2 rounded-md text-xs">
+                        <div className="font-medium">Most Suspicious File:</div>
+                        <div className="mt-1">{detectionResult.analysisOverview.mostSuspiciousFile}</div>
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <div className="text-sm font-medium">Suspicious Files:</div>
+                      <ScrollArea className="h-[150px]">
+                        <div className="space-y-1">
+                          {detectionResult.results.map((result: any, index: number) => (
+                            <div 
+                              key={index} 
+                              className={`text-xs p-2 rounded-md ${
+                                result.confidence?.includes('High') 
+                                  ? 'bg-green-900/20 border border-green-500/30' 
+                                  : 'bg-amber-900/20 border border-amber-500/30'
+                              }`}
+                            >
+                              <div className="flex justify-between">
+                                <span className="font-medium">{result.fileName}</span>
+                                <span>{result.confidence}</span>
+                              </div>
+                              <div className="mt-1 text-gray-400">
+                                <span className="text-gray-300">{result.technique}:</span> {result.findings}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+          
+          {extractionGuides.length > 0 && (
+            <div className="mt-4">
+              <h3 className="text-sm font-bold mb-2 flex items-center">
+                <Key className="h-4 w-4 mr-2 text-cyber-blue" />
+                <span>Extraction Guides</span>
+              </h3>
+              
+              <ScrollArea className="h-[300px]">
+                <div className="space-y-4 pr-4">
+                  {extractionGuides.map((guide, index) => (
+                    <StepByStepGuide
+                      key={index}
+                      technique={guide.technique}
+                      fileType={guide.fileType}
+                      steps={guide.steps}
+                      commands={guide.commands}
+                      toolsSuggested={guide.toolsSuggested}
+                    />
+                  ))}
+                </div>
+              </ScrollArea>
+            </div>
+          )}
+          
+          {detectionHistory.length > 0 && (
+            <div className="mt-4">
+              <div className="text-sm font-medium mb-2 flex items-center">
+                <FileDigit className="h-4 w-4 mr-2 text-gray-400" />
+                <span>Analysis History</span>
+              </div>
+              
+              <div className="max-h-[150px] overflow-y-auto space-y-1 text-xs">
+                {detectionHistory.map((entry, index) => (
+                  <div key={index} className="flex py-1 border-b border-gray-800">
+                    <span className="text-gray-500 mr-2">{entry.timestamp}</span>
+                    <span className="text-gray-300 mr-2">[{entry.method}]</span>
+                    <span>{entry.result}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-      
-      <ScrollArea className="h-[250px] p-2">
-        {extractedFiles.map((file, index) => (
-          <FileTreeItem 
-            key={index} 
-            node={file} 
-            level={0} 
-            onSelect={() => {}}
-            expanded={{}}
-            toggleExpand={() => {}}
-          />
-        ))}
-      </ScrollArea>
-      
-      <div className="mt-4">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-xs px-2 py-0"
-          onClick={autoAnalyzeExtractedFiles}
-        >
-          Analyze Extracted Files
-        </Button>
-      </div>
-      
-      <div className="mt-4">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 text-xs px-2 py-0"
-          onClick={processPasswordProtectedArchive}
-        >
-          Extract Password Protected Archive
-        </Button>
       </div>
     </div>
   );
