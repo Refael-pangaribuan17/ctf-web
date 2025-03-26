@@ -740,8 +740,8 @@ const SteganographyTool: React.FC = () => {
       },
       {
         technique: "Temporal Steganography",
-        confidence: "Medium (59%)",
-        findings: "Possible data hidden in frame transitions."
+        findings: "Possible data hidden in frame transitions.",
+        confidence: "Medium (59%)"
       }
     ];
   };
@@ -871,7 +871,7 @@ const SteganographyTool: React.FC = () => {
         }
         
         // Handle special cases by filename
-        if (fileName === 'flag.txt' || fileName.match(/flag\{.*\}/i)) {
+        if (fileName === 'flag.txt' || fileName.match(/flag\\{.*\\}/i)) {
           result = {
             path: filePath,
             fileName,
