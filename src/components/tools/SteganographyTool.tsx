@@ -65,7 +65,6 @@ interface FileNode {
   selected?: boolean;
 }
 
-// FileTreeItem component for displaying extracted archive contents
 const FileTreeItem: React.FC<{
   node: FileNode;
   level: number;
@@ -142,7 +141,6 @@ const FileTreeItem: React.FC<{
   );
 };
 
-// FileTree component for displaying a hierarchical structure of files
 const FileTree: React.FC<{
   files: FileNode[];
   onSelectFiles: (paths: string[]) => void;
@@ -248,7 +246,6 @@ const FileTree: React.FC<{
   );
 };
 
-// StepByStepGuide component for showing extraction steps for steganography
 const StepByStepGuide: React.FC<{
   technique: string;
   fileType: string;
@@ -303,7 +300,6 @@ const StepByStepGuide: React.FC<{
   );
 };
 
-// Main SteganographyTool component
 const SteganographyTool: React.FC = () => {
   const [image, setImage] = useState<string | null>(null);
   const [audioFile, setAudioFile] = useState<string | null>(null);
@@ -334,7 +330,6 @@ const SteganographyTool: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  // Reset archive extraction states
   const resetArchiveStates = () => {
     setExtractedFiles([]);
     setSelectedExtractedFiles([]);
@@ -347,15 +342,12 @@ const SteganographyTool: React.FC = () => {
     setArchiveExtractionError(null);
   };
 
-  // File handling functions
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'image' | 'audio' | 'video' | 'text' | 'archive') => {
     const file = e.target.files?.[0];
     if (!file) return;
     
-    // For any file type, if auto-detect is enabled, automatically analyze it
     const shouldAutoAnalyze = autoDetectMode;
     
-    // Special handling for archive files
     if (fileType === 'archive') {
       const fileName = file.name.toLowerCase();
       const isArchive = ARCHIVE_EXTENSIONS.some(ext => fileName.endsWith(ext));
@@ -369,19 +361,15 @@ const SteganographyTool: React.FC = () => {
         return;
       }
       
-      // Reset previous archive states
       resetArchiveStates();
       
-      // Create a File URL
       const fileUrl = URL.createObjectURL(file);
       setArchiveFile(fileUrl);
       
-      // Simulate the archive extraction process
       simulateArchiveExtraction(file);
       return;
     }
     
-    // For non-archive files, use the existing logic
     const fileTypeMappings = {
       'image': ['image/'],
       'audio': ['audio/'],
@@ -420,7 +408,6 @@ const SteganographyTool: React.FC = () => {
       setResult(null);
       setDetectionResult(null);
       
-      // If auto-detect is enabled, automatically run comprehensive analysis
       if (shouldAutoAnalyze) {
         setTimeout(() => {
           runComprehensiveAnalysis(fileType, file);
@@ -435,21 +422,18 @@ const SteganographyTool: React.FC = () => {
     }
   };
 
-  // New method for running comprehensive steganography analysis
   const runComprehensiveAnalysis = (fileType: string, file: File) => {
     setIsProcessing(true);
     setAnalysisInProgress(true);
     setExtractionGuides([]);
     
-    // Show toast to inform user that automatic analysis is in progress
     toast({
       title: "Automatic Analysis Started",
       description: "Running comprehensive steganography detection on your file...",
     });
     
-    // Determine analysis time based on file type and size
     const baseProcessingTime = 3000;
-    const sizeFactorMs = file.size / 1000000 * 500; // 500ms per MB
+    const sizeFactorMs = file.size / 1000000 * 500;
     const processingTime = baseProcessingTime + sizeFactorMs;
     
     setTimeout(() => {
@@ -457,30 +441,24 @@ const SteganographyTool: React.FC = () => {
       let primaryTechnique = '';
       let confidenceLevel = '';
       
-      // Generate different analysis results based on file type
       switch (fileType) {
         case 'image':
-          // Run all relevant image analysis techniques
           detectionResults = runAllImageAnalysisTechniques(file.name);
           break;
         
         case 'audio':
-          // Run all relevant audio analysis techniques
           detectionResults = runAllAudioAnalysisTechniques(file.name);
           break;
           
         case 'video':
-          // Run all relevant video analysis techniques
           detectionResults = runAllVideoAnalysisTechniques(file.name);
           break;
           
         case 'text':
-          // Run all relevant text analysis techniques
           detectionResults = runAllTextAnalysisTechniques(file.name);
           break;
           
         default:
-          // Generic analysis for other file types
           detectionResults = [{
             technique: "Binary Analysis",
             confidence: "Medium (65%)",
@@ -488,24 +466,20 @@ const SteganographyTool: React.FC = () => {
           }];
       }
       
-      // Sort results by confidence level
       detectionResults.sort((a, b) => {
         const confidenceA = parseInt(a.confidence?.split('%')[0]?.split('(')[1] || '0');
         const confidenceB = parseInt(b.confidence?.split('%')[0]?.split('(')[1] || '0');
         return confidenceB - confidenceA;
       });
       
-      // Extract the primary detection technique and confidence
       if (detectionResults.length > 0) {
         primaryTechnique = detectionResults[0].technique;
         confidenceLevel = detectionResults[0].confidence;
       }
       
-      // Generate extraction guides for the detected techniques
       const guides = generateExtractionGuides(detectionResults, file.name);
       setExtractionGuides(guides);
       
-      // Create a comprehensive detection result
       setDetectionResult({
         type: 'comprehensive-analysis',
         fileName: file.name,
@@ -517,7 +491,6 @@ const SteganographyTool: React.FC = () => {
         summary: `Comprehensive analysis found ${detectionResults.length} potential steganography techniques in ${file.name}.`
       });
       
-      // Add to history
       setDetectionHistory(prev => [
         ...prev, 
         { 
@@ -536,16 +509,14 @@ const SteganographyTool: React.FC = () => {
       });
     }, processingTime);
   };
-  
-  // Format file size in human-readable format
+
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return bytes + ' B';
     else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
     else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + ' MB';
     else return (bytes / 1073741824).toFixed(1) + ' GB';
   };
-  
-  // Generate extraction guides based on detected techniques
+
   const generateExtractionGuides = (techniques: any[], fileName: string) => {
     return techniques.map(technique => {
       const techName = technique.technique?.toLowerCase() || '';
@@ -642,7 +613,6 @@ const SteganographyTool: React.FC = () => {
           toolsSuggested: ["Binwalk", "Foremost", "hexdump", "HxD (Hex Editor)"]
         };
       } else {
-        // Generic guide for other techniques
         return {
           technique: technique.technique || "Advanced Steganography",
           fileType: "various",
@@ -663,8 +633,7 @@ const SteganographyTool: React.FC = () => {
       }
     });
   };
-  
-  // Run all image analysis techniques
+
   const runAllImageAnalysisTechniques = (fileName: string) => {
     const techniques = [
       {
@@ -690,7 +659,6 @@ const SteganographyTool: React.FC = () => {
       }
     ];
     
-    // If filename contains indicators, boost certain techniques
     if (fileName.toLowerCase().includes('hidden') || fileName.toLowerCase().includes('secret')) {
       techniques[0].confidence = "Very High (98%)";
       techniques[0].findings = "Strong evidence of LSB steganography with embedded text or file.";
@@ -698,8 +666,7 @@ const SteganographyTool: React.FC = () => {
     
     return techniques;
   };
-  
-  // Run all audio analysis techniques
+
   const runAllAudioAnalysisTechniques = (fileName: string) => {
     return [
       {
@@ -724,8 +691,7 @@ const SteganographyTool: React.FC = () => {
       }
     ];
   };
-  
-  // Run all video analysis techniques
+
   const runAllVideoAnalysisTechniques = (fileName: string) => {
     return [
       {
@@ -745,8 +711,7 @@ const SteganographyTool: React.FC = () => {
       }
     ];
   };
-  
-  // Run all text analysis techniques
+
   const runAllTextAnalysisTechniques = (fileName: string) => {
     return [
       {
@@ -767,7 +732,6 @@ const SteganographyTool: React.FC = () => {
     ];
   };
 
-  // Auto-analyze extracted files
   const autoAnalyzeExtractedFiles = () => {
     if (extractedFiles.length === 0) {
       toast({
@@ -786,7 +750,6 @@ const SteganographyTool: React.FC = () => {
       description: "Analyzing all extracted files for steganography...",
     });
     
-    // Collect all files from the file tree
     const allFilePaths: string[] = [];
     const collectFiles = (nodes: FileNode[]) => {
       nodes.forEach(node => {
@@ -804,12 +767,10 @@ const SteganographyTool: React.FC = () => {
     const processingTime = 2000 + (totalFiles * 300);
     
     setTimeout(() => {
-      // Generate results for each file
       const results: any[] = allFilePaths.map(filePath => {
         const fileName = filePath.split('/').pop() || '';
         const fileType = getFileType(fileName);
         
-        // Generate analysis results based on file type and name
         let result: any = {
           path: filePath,
           fileName,
@@ -819,7 +780,6 @@ const SteganographyTool: React.FC = () => {
           findings: "No obvious steganography detected"
         };
         
-        // Enhanced detection for files with suspicious names
         if (fileName.toLowerCase().includes('hidden') || 
             fileName.toLowerCase().includes('secret') || 
             fileName.toLowerCase().includes('flag') ||
@@ -870,7 +830,6 @@ const SteganographyTool: React.FC = () => {
           }
         }
         
-        // Handle special cases by filename
         if (fileName === 'flag.txt' || fileName.match(/flag\\{.*\\}/i)) {
           result = {
             path: filePath,
@@ -885,7 +844,406 @@ const SteganographyTool: React.FC = () => {
         return result;
       });
       
-      // Filter results to only show those with medium or high confidence
       const significantResults = results.filter(r => 
         r.confidence.includes("Medium") || 
         r.confidence.includes("High")
+      );
+      
+      const analysisOverview = {
+        totalFiles: allFilePaths.length,
+        suspiciousFiles: significantResults.length,
+        techniques: Array.from(new Set(significantResults.map(r => r.technique))),
+        highConfidenceCount: significantResults.filter(r => r.confidence.includes("High")).length,
+        mediumConfidenceCount: significantResults.filter(r => r.confidence.includes("Medium")).length,
+        mostSuspiciousFile: significantResults.length > 0 ? 
+          significantResults.sort((a, b) => {
+            const confidenceA = parseInt(a.confidence?.split('%')[0]?.split('(')[1] || '0');
+            const confidenceB = parseInt(b.confidence?.split('%')[0]?.split('(')[1] || '0');
+            return confidenceB - confidenceA;
+          })[0].fileName : null
+      };
+      
+      significantResults.sort((a, b) => {
+        const confidenceA = parseInt(a.confidence?.split('%')[0]?.split('(')[1] || '0');
+        const confidenceB = parseInt(b.confidence?.split('%')[0]?.split('(')[1] || '0');
+        return confidenceB - confidenceA;
+      });
+      
+      const guides = significantResults.slice(0, 3).map(result => {
+        const techName = result.technique?.toLowerCase() || '';
+        return generateExtractionGuideForTechnique(techName, result.fileName, result.fileType);
+      }).filter(Boolean);
+      
+      setExtractionGuides(guides);
+      
+      setDetectionResult({
+        type: 'archive-analysis',
+        summary: `Found ${significantResults.length} suspicious files in archive with potential steganography.`,
+        analysisOverview,
+        results: significantResults
+      });
+      
+      setDetectionHistory(prev => [
+        ...prev, 
+        { 
+          timestamp: new Date().toLocaleTimeString(), 
+          method: "Archive Analysis", 
+          result: `Analyzed ${totalFiles} files in archive. Found ${significantResults.length} suspicious files.`
+        }
+      ]);
+      
+      setIsProcessing(false);
+      setAnalysisInProgress(false);
+      
+      toast({
+        title: "Archive Analysis Complete",
+        description: `Found ${significantResults.length} suspicious files out of ${totalFiles} total files.`,
+      });
+    }, processingTime);
+  };
+
+  const generateExtractionGuideForTechnique = (technique: string, fileName: string, fileType: string) => {
+    if (technique.includes('lsb')) {
+      return {
+        technique: "LSB Steganography",
+        fileType: fileType,
+        fileName: fileName,
+        steps: [
+          "Extract the file from the archive first.",
+          "Use StegSolve or another LSB extraction tool to view the least significant bits.",
+          "Check blue channel first as it's the most common for LSB steganography.",
+          "Extract bits sequentially to recover hidden data.",
+          "Try different bit planes (0-7) for each RGB channel."
+        ],
+        commands: [
+          `stegsolve ${fileName}`,
+          `zsteg -a ${fileName}`,
+          `steghide extract -sf ${fileName}`
+        ],
+        toolsSuggested: ["StegSolve", "zsteg", "steghide", "OpenStego"]
+      };
+    }
+    
+    return null;
+  };
+
+  const simulateArchiveExtraction = (file: File) => {
+    setIsExtracting(true);
+    setExtractionProgress(0);
+    
+    const potentiallyEncrypted = file.name.toLowerCase().includes('secure') || 
+                              file.name.toLowerCase().includes('protected') || 
+                              file.name.toLowerCase().includes('encrypted');
+    
+    const totalSteps = 20;
+    const extractionTime = 2000 + (file.size / 1000000 * 300);
+    const interval = extractionTime / totalSteps;
+    
+    let currentStep = 0;
+    const extractionInterval = setInterval(() => {
+      currentStep++;
+      setExtractionProgress(Math.round((currentStep / totalSteps) * 100));
+      
+      if (currentStep === Math.floor(totalSteps * 0.3) && potentiallyEncrypted) {
+        clearInterval(extractionInterval);
+        setIsArchiveEncrypted(true);
+        setShowArchivePassword(true);
+        setExtractionProgress(30);
+        toast({
+          title: "Password Protected Archive",
+          description: "This archive appears to be password protected.",
+        });
+        return;
+      }
+      
+      if (currentStep >= totalSteps) {
+        clearInterval(extractionInterval);
+        setIsExtracting(false);
+        setExtractionProgress(100);
+        
+        const extractedFileStructure = generateMockFileStructure(file.name, file.size);
+        setExtractedFiles(extractedFileStructure);
+        
+        toast({
+          title: "Archive Extraction Complete",
+          description: "The archive has been successfully extracted.",
+        });
+      }
+    }, interval);
+  };
+
+  const generateMockFileStructure = (archiveName: string, archiveSize: number): FileNode[] => {
+    const baseStructure: FileNode = {
+      name: archiveName.split('.')[0],
+      type: 'directory',
+      path: archiveName.split('.')[0],
+      children: []
+    };
+    
+    if (archiveName.toLowerCase().includes('ctf') || archiveName.toLowerCase().includes('challenge')) {
+      baseStructure.children = [
+        {
+          name: 'challenge',
+          type: 'directory',
+          path: `${baseStructure.path}/challenge`,
+          children: [
+            {
+              name: 'README.txt',
+              type: 'file',
+              path: `${baseStructure.path}/challenge/README.txt`,
+              fileType: 'text',
+              fileSize: '1.2 KB'
+            },
+            {
+              name: 'secret.jpg',
+              type: 'file',
+              path: `${baseStructure.path}/challenge/secret.jpg`,
+              fileType: 'image',
+              fileSize: '45.8 KB'
+            },
+            {
+              name: 'data.bin',
+              type: 'file',
+              path: `${baseStructure.path}/challenge/data.bin`,
+              fileType: 'unknown',
+              fileSize: '12.4 KB'
+            }
+          ]
+        },
+        {
+          name: 'hints',
+          type: 'directory',
+          path: `${baseStructure.path}/hints`,
+          children: [
+            {
+              name: 'hint1.txt',
+              type: 'file',
+              path: `${baseStructure.path}/hints/hint1.txt`,
+              fileType: 'text',
+              fileSize: '0.5 KB'
+            }
+          ]
+        }
+      ];
+    } else if (archiveName.toLowerCase().includes('photo') || archiveName.toLowerCase().includes('image') || archiveName.toLowerCase().includes('pic')) {
+      baseStructure.children = [
+        {
+          name: 'images',
+          type: 'directory',
+          path: `${baseStructure.path}/images`,
+          children: [
+            {
+              name: 'img001.jpg',
+              type: 'file',
+              path: `${baseStructure.path}/images/img001.jpg`,
+              fileType: 'image',
+              fileSize: '1.2 MB'
+            },
+            {
+              name: 'img002.jpg',
+              type: 'file',
+              path: `${baseStructure.path}/images/img002.jpg`,
+              fileType: 'image',
+              fileSize: '2.4 MB'
+            },
+            {
+              name: 'hidden.png',
+              type: 'file',
+              path: `${baseStructure.path}/images/hidden.png`,
+              fileType: 'image',
+              fileSize: '356.2 KB'
+            }
+          ]
+        },
+        {
+          name: 'metadata.txt',
+          type: 'file',
+          path: `${baseStructure.path}/metadata.txt`,
+          fileType: 'text',
+          fileSize: '2.8 KB'
+        }
+      ];
+    } else {
+      const fileCount = Math.max(3, Math.min(20, Math.floor(archiveSize / 100000)));
+      const files: FileNode[] = [];
+      
+      for (let i = 0; i < fileCount; i++) {
+        const fileTypes = ['image', 'text', 'audio', 'video', 'archive'];
+        const fileType = fileTypes[Math.floor(Math.random() * fileTypes.length)] as 'image' | 'audio' | 'video' | 'text' | 'archive';
+        
+        const fileExtensions: Record<string, string[]> = {
+          'image': ['.jpg', '.png', '.gif'],
+          'text': ['.txt', '.pdf', '.doc'],
+          'audio': ['.mp3', '.wav'],
+          'video': ['.mp4', '.avi'],
+          'archive': ['.zip', '.rar']
+        };
+        
+        const ext = fileExtensions[fileType][Math.floor(Math.random() * fileExtensions[fileType].length)];
+        const size = Math.floor(Math.random() * 2000) + 100;
+        
+        files.push({
+          name: `file${i+1}${ext}`,
+          type: 'file',
+          path: `${baseStructure.path}/file${i+1}${ext}`,
+          fileType: fileType,
+          fileSize: `${(size / 1000).toFixed(1)} MB`
+        });
+      }
+      
+      files.push({
+        name: 'secret_data.txt',
+        type: 'file',
+        path: `${baseStructure.path}/secret_data.txt`,
+        fileType: 'text',
+        fileSize: '3.2 KB'
+      });
+      
+      files.push({
+        name: 'hidden_message.jpg',
+        type: 'file',
+        path: `${baseStructure.path}/hidden_message.jpg`,
+        fileType: 'image',
+        fileSize: '256.0 KB'
+      });
+      
+      baseStructure.children = files;
+    }
+    
+    return [baseStructure];
+  };
+
+  const processPasswordProtectedArchive = () => {
+    if (!archivePassword) {
+      setArchiveExtractionError("Password is required to extract this archive.");
+      return;
+    }
+    
+    setIsExtracting(true);
+    setArchiveExtractionError(null);
+    setShowArchivePassword(false);
+    
+    setTimeout(() => {
+      const passwordCorrect = Math.random() < 0.8;
+      
+      if (!passwordCorrect) {
+        setIsExtracting(false);
+        setArchiveExtractionError("Incorrect password. Please try again.");
+        setShowArchivePassword(true);
+        toast({
+          title: "Extraction Failed",
+          description: "The password provided is incorrect.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      const totalSteps = 20;
+      const remainingSteps = totalSteps - Math.floor(totalSteps * 0.3);
+      const interval = 2000 / remainingSteps;
+      
+      let currentProgress = 30;
+      const extractionInterval = setInterval(() => {
+        currentProgress += Math.round(70 / remainingSteps);
+        setExtractionProgress(Math.min(currentProgress, 100));
+        
+        if (currentProgress >= 100) {
+          clearInterval(extractionInterval);
+          setIsExtracting(false);
+          
+          const extractedFileStructure = generateMockFileStructure("protected_archive.zip", 1000000);
+          setExtractedFiles(extractedFileStructure);
+          
+          toast({
+            title: "Archive Extraction Complete",
+            description: "The password-protected archive has been successfully extracted.",
+          });
+        }
+      }, interval);
+    }, 1500);
+  };
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <Image className="h-5 w-5 text-cyber-blue" />
+        <span>Advanced Steganography Tool</span>
+      </h2>
+      
+      <div className="flex justify-between items-center">
+        <div className="flex items-center">
+          <Archive className="h-4 w-4 mr-2 text-gray-400" />
+          <span className="text-sm font-medium">Extracted Files</span>
+        </div>
+        <div className="flex gap-1">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs px-2 py-0"
+            onClick={() => {
+              const allExpanded: Record<string, boolean> = {};
+              const expandAll = (nodes: FileNode[]) => {
+                nodes.forEach(node => {
+                  if (node.type === 'directory') {
+                    allExpanded[node.path] = true;
+                    if (node.children) expandAll(node.children);
+                  }
+                });
+              };
+              expandAll(extractedFiles);
+            }}
+          >
+            Expand All
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 text-xs px-2 py-0"
+            onClick={() => {
+              setExpanded({});
+            }}
+          >
+            Collapse All
+          </Button>
+        </div>
+      </div>
+      
+      <ScrollArea className="h-[250px] p-2">
+        {extractedFiles.map((file, index) => (
+          <FileTreeItem 
+            key={index} 
+            node={file} 
+            level={0} 
+            onSelect={() => {}}
+            expanded={{}}
+            toggleExpand={() => {}}
+          />
+        ))}
+      </ScrollArea>
+      
+      <div className="mt-4">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-xs px-2 py-0"
+          onClick={autoAnalyzeExtractedFiles}
+        >
+          Analyze Extracted Files
+        </Button>
+      </div>
+      
+      <div className="mt-4">
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 text-xs px-2 py-0"
+          onClick={processPasswordProtectedArchive}
+        >
+          Extract Password Protected Archive
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default SteganographyTool;
