@@ -1,9 +1,20 @@
+
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
-  ({ className, type, ...props }, ref) => {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  onKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, onKeyPress, ...props }, ref) => {
+    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (onKeyPress) {
+        onKeyPress(e);
+      }
+    };
+
     return (
       <input
         type={type}
@@ -12,6 +23,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           className
         )}
         ref={ref}
+        onKeyPress={handleKeyPress}
         {...props}
       />
     )
