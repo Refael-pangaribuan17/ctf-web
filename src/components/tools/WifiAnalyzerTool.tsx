@@ -1,86 +1,146 @@
 
-import React, { useState, useEffect } from 'react';
-import { Wifi, WifiOff, Shield, Users, Info } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Wifi, WifiOff, Shield, Users, Info, Activity, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
+import { toast } from "@/hooks/use-toast";
 
-// Mock data for WiFi networks since browsers can't directly scan WiFi
-const mockWifiNetworks = [
-  { 
-    ssid: "Home_Network", 
-    bssid: "00:1A:2B:3C:4D:5E", 
-    security: "WPA2", 
-    signalStrength: 87, 
-    channel: 6,
-    frequency: "2.4 GHz",
-    clients: [
-      { mac: "12:34:56:78:9A:BC", hostname: "iPhone", connectTime: "2 hours", signalQuality: 92, dataUsage: "1.2 GB" },
-      { mac: "23:45:67:89:AB:CD", hostname: "MacBook", connectTime: "5 hours", signalQuality: 85, dataUsage: "3.7 GB" },
-      { mac: "34:56:78:9A:BC:DE", hostname: "Android-TV", connectTime: "12 hours", signalQuality: 78, dataUsage: "8.5 GB" }
-    ]
-  },
-  { 
-    ssid: "Guest_Network", 
-    bssid: "00:2B:3C:4D:5E:6F", 
-    security: "WPA2", 
-    signalStrength: 65, 
-    channel: 11,
-    frequency: "2.4 GHz",
-    clients: [
-      { mac: "45:67:89:AB:CD:EF", hostname: "Guest-Phone", connectTime: "30 minutes", signalQuality: 72, dataUsage: "0.3 GB" }
-    ]
-  },
-  { 
-    ssid: "Office_5G", 
-    bssid: "00:3C:4D:5E:6F:7G", 
-    security: "WPA3", 
-    signalStrength: 92, 
-    channel: 36,
-    frequency: "5 GHz",
-    clients: [
-      { mac: "56:78:9A:BC:DE:F0", hostname: "Work-Laptop", connectTime: "8 hours", signalQuality: 95, dataUsage: "5.8 GB" },
-      { mac: "67:89:AB:CD:EF:01", hostname: "Conference-Tablet", connectTime: "4 hours", signalQuality: 90, dataUsage: "2.1 GB" }
-    ]
+// Simulated WiFi data - in a real app, this would come from native APIs through Capacitor/Cordova
+// Web browsers cannot directly access WiFi information due to security restrictions
+const generateMockNetworks = () => {
+  // This is only a simulation - in a real world app, we'd use device APIs
+  const networks = [
+    { 
+      ssid: "Home_Network", 
+      bssid: "00:1A:2B:3C:4D:5E", 
+      security: "WPA2", 
+      signalStrength: Math.floor(Math.random() * 20) + 75, // 75-95%
+      channel: 6,
+      frequency: "2.4 GHz",
+      clients: [
+        { mac: "12:34:56:78:9A:BC", hostname: "iPhone", connectTime: "2 hours", signalQuality: Math.floor(Math.random() * 10) + 85, dataUsage: "1.2 GB" },
+        { mac: "23:45:67:89:AB:CD", hostname: "MacBook", connectTime: "5 hours", signalQuality: Math.floor(Math.random() * 15) + 80, dataUsage: "3.7 GB" },
+      ]
+    },
+    { 
+      ssid: "Guest_Network", 
+      bssid: "00:2B:3C:4D:5E:6F", 
+      security: "WPA2", 
+      signalStrength: Math.floor(Math.random() * 30) + 50, // 50-80%
+      channel: 11,
+      frequency: "2.4 GHz",
+      clients: [
+        { mac: "45:67:89:AB:CD:EF", hostname: "Guest-Phone", connectTime: "30 minutes", signalQuality: Math.floor(Math.random() * 20) + 60, dataUsage: "0.3 GB" }
+      ]
+    }
+  ];
+  
+  // Randomly determine if we should add a 5GHz network for variety
+  if (Math.random() > 0.3) {
+    networks.push({ 
+      ssid: "Office_5G", 
+      bssid: "00:3C:4D:5E:6F:7G", 
+      security: "WPA3", 
+      signalStrength: Math.floor(Math.random() * 15) + 85, // 85-100%
+      channel: 36,
+      frequency: "5 GHz",
+      clients: [
+        { mac: "56:78:9A:BC:DE:F0", hostname: "Work-Laptop", connectTime: "8 hours", signalQuality: Math.floor(Math.random() * 10) + 90, dataUsage: "5.8 GB" },
+      ]
+    });
   }
-];
+  
+  return networks;
+};
 
 const WifiAnalyzerTool = () => {
   const [scanning, setScanning] = useState(false);
-  const [networks, setNetworks] = useState<typeof mockWifiNetworks>([]);
-  const [selectedNetwork, setSelectedNetwork] = useState<(typeof mockWifiNetworks)[0] | null>(null);
-  const [handshakeCaptured, setHandshakeCaptured] = useState(false);
-  const [dictionaryFile, setDictionaryFile] = useState<File | null>(null);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [networks, setNetworks] = useState<ReturnType<typeof generateMockNetworks>>([]);
+  const [selectedNetwork, setSelectedNetwork] = useState<ReturnType<typeof generateMockNetworks>[0] | null>(null);
+  const [scanInterval, setScanInterval] = useState<NodeJS.Timeout | null>(null);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
 
-  // Simulate WiFi scanning
-  const handleScan = () => {
+  // Function to perform a simulated scan
+  const handleScan = useCallback(() => {
+    // Clear any existing scan interval
+    if (scanInterval) {
+      clearInterval(scanInterval);
+      setScanInterval(null);
+    }
+    
     setScanning(true);
+    setScanProgress(0);
     setNetworks([]);
     
-    // Simulate scan delay
+    // Simulate progressive scan with progress updates
+    const progressInterval = setInterval(() => {
+      setScanProgress(prev => {
+        if (prev >= 100) {
+          clearInterval(progressInterval);
+          return 100;
+        }
+        return prev + 5;
+      });
+    }, 100);
+    
+    // Simulate scan completion
     setTimeout(() => {
-      setNetworks(mockWifiNetworks);
+      clearInterval(progressInterval);
+      setScanProgress(100);
+      
+      // Generate slightly randomized "real-time" data
+      const newNetworks = generateMockNetworks();
+      setNetworks(newNetworks);
       setScanning(false);
+      setLastScanTime(new Date());
+      
+      toast({
+        title: "Scan Complete",
+        description: `Found ${newNetworks.length} networks`,
+      });
     }, 2500);
-  };
+  }, [scanInterval]);
 
-  const handleNetworkSelect = (network: typeof mockWifiNetworks[0]) => {
+  // Auto-rescan periodically to simulate real-time updates
+  const startAutoScan = useCallback(() => {
+    if (scanInterval) {
+      clearInterval(scanInterval);
+    }
+    
+    const interval = setInterval(() => {
+      if (!scanning) {
+        handleScan();
+      }
+    }, 30000); // Auto-scan every 30 seconds
+    
+    setScanInterval(interval);
+    
+    // Clean up on component unmount
+    return () => {
+      if (scanInterval) clearInterval(scanInterval);
+    };
+  }, [handleScan, scanInterval, scanning]);
+
+  const handleNetworkSelect = (network: ReturnType<typeof generateMockNetworks>[0]) => {
     setSelectedNetwork(network);
-  };
-
-  const handleCaptureHandshake = () => {
-    // In a real application, this would attempt to capture a handshake
-    // Here we just simulate it with a timeout
-    setHandshakeCaptured(true);
   };
 
   useEffect(() => {
     // Auto-scan on component mount
     handleScan();
-  }, []);
+    
+    // Start auto-scan feature
+    startAutoScan();
+    
+    // Cleanup when component unmounts
+    return () => {
+      if (scanInterval) clearInterval(scanInterval);
+    };
+  }, [handleScan, startAutoScan, scanInterval]);
 
   const getSignalIcon = (strength: number) => {
     if (strength > 80) return <Wifi className="h-5 w-5 text-green-500" />;
@@ -88,8 +148,10 @@ const WifiAnalyzerTool = () => {
     return <Wifi className="h-5 w-5 text-red-500" />;
   };
 
-  const getSecurityIcon = (security: string) => {
-    return <Shield className="h-5 w-5 text-blue-500" title={security} />;
+  const getSecurityBadge = (security: string) => {
+    const color = security === "WPA3" ? "bg-green-600" : 
+                  security === "WPA2" ? "bg-blue-600" : "bg-red-600";
+    return <Badge className={color}>{security}</Badge>;
   };
 
   return (
@@ -100,10 +162,21 @@ const WifiAnalyzerTool = () => {
           WiFi Analyzer
         </CardTitle>
         <CardDescription>
-          Scan, analyze, and monitor WiFi networks and connected devices
+          Scan and analyze WiFi networks and connected devices
         </CardDescription>
       </CardHeader>
       <CardContent>
+        <div className="mb-4 p-3 border border-orange-500/30 bg-orange-950/20 rounded-md">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-orange-200">
+              <strong>Browser Limitation:</strong> Web browsers cannot directly access WiFi information due to security restrictions. 
+              This is a simulation showing how the tool would work on a native app. For real WiFi scanning, this application would need 
+              to be compiled as a native app using Capacitor or a similar framework.
+            </p>
+          </div>
+        </div>
+
         <Tabs defaultValue="networks" className="w-full">
           <TabsList className="grid grid-cols-2 mb-4">
             <TabsTrigger value="networks">Network Scanner</TabsTrigger>
@@ -111,21 +184,36 @@ const WifiAnalyzerTool = () => {
           </TabsList>
           
           <TabsContent value="networks" className="space-y-4">
-            <div className="flex flex-wrap gap-4 mb-4">
-              <Button 
-                onClick={handleScan} 
-                className="bg-cyber-blue hover:bg-cyber-blue/80"
-                disabled={scanning}
-              >
-                {scanning ? "Scanning..." : "Scan Networks"}
-              </Button>
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <Button 
+                  onClick={handleScan} 
+                  className="bg-cyber-blue hover:bg-cyber-blue/80 flex items-center gap-2"
+                  disabled={scanning}
+                >
+                  <RefreshCw className={`h-4 w-4 ${scanning ? 'animate-spin' : ''}`} />
+                  {scanning ? "Scanning..." : "Scan Networks"}
+                </Button>
+                
+                {lastScanTime && (
+                  <span className="text-xs text-gray-400">
+                    Last scan: {lastScanTime.toLocaleTimeString()}
+                  </span>
+                )}
+              </div>
+              
+              {networks.length > 0 && (
+                <Badge variant="outline" className="bg-gray-800/50">
+                  {networks.length} networks found
+                </Badge>
+              )}
             </div>
 
             {scanning ? (
               <div className="text-center py-8">
                 <Wifi className="h-8 w-8 mx-auto mb-4 animate-pulse text-cyan-400" />
                 <p>Scanning for WiFi networks...</p>
-                <Progress value={45} className="w-full mt-4" />
+                <Progress value={scanProgress} className="w-full mt-4" />
               </div>
             ) : networks.length > 0 ? (
               <div className="grid gap-4">
@@ -148,8 +236,8 @@ const WifiAnalyzerTool = () => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {getSecurityIcon(network.security)}
-                        <Badge variant="outline">{network.security}</Badge>
+                        <Shield className="h-5 w-5 text-blue-500" aria-label={network.security} />
+                        {getSecurityBadge(network.security)}
                         <Badge className="bg-blue-600">{network.signalStrength}%</Badge>
                       </div>
                     </div>
@@ -218,9 +306,12 @@ const WifiAnalyzerTool = () => {
         </Tabs>
       </CardContent>
       <CardFooter className="flex flex-col items-start border-t border-gray-800 pt-4">
-        <p className="text-xs text-gray-500 mb-2">
-          Note: This is a simulation for educational purposes. In a real-world CTF, WiFi analysis requires specialized hardware.
-        </p>
+        <div className="flex items-start gap-2">
+          <Activity className="h-4 w-4 text-cyan-400 mt-0.5" />
+          <p className="text-xs text-gray-500">
+            For real-time WiFi analysis in a production app, this tool would use native device APIs through frameworks like Capacitor.
+          </p>
+        </div>
       </CardFooter>
     </Card>
   );
