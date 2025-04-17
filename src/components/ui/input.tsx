@@ -4,14 +4,15 @@ import * as React from "react"
 import { cn } from "@/lib/utils"
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
-  onKeyPress?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  // Replace onKeyPress with onKeyDown as onKeyPress is deprecated
+  onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, onKeyPress, ...props }, ref) => {
-    const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (onKeyPress) {
-        onKeyPress(e);
+  ({ className, type, onKeyDown, ...props }, ref) => {
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (onKeyDown) {
+        onKeyDown(e);
       }
     };
 
@@ -23,7 +24,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           className
         )}
         ref={ref}
-        onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyDown}
         {...props}
       />
     )

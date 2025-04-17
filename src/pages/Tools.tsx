@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, KeySquare, Code, Network, Globe, Database, RotateCw, Key, Shield, Terminal, Image, Wifi, FileSearch, Braces, KeyRound, Bug, Search, ChevronLeft, FileArchive } from 'lucide-react';
@@ -23,6 +22,7 @@ import WebExploitTool from '@/components/tools/WebExploitTool';
 import ReconTool from '@/components/tools/ReconTool';
 import BackgroundAnimation from '@/components/BackgroundAnimation';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 type Tool = {
@@ -188,7 +188,6 @@ const Tools = () => {
   ];
 
   useEffect(() => {
-    // Reset selected tool when category changes
     setSelectedTool(null);
   }, [activeCategory]);
 
@@ -196,14 +195,12 @@ const Tools = () => {
     if (isTransitioning) return;
     
     if (selectedTool === toolId) {
-      // Deselect the tool
       setIsTransitioning(true);
       setTimeout(() => {
         setSelectedTool(null);
         setIsTransitioning(false);
       }, 300);
     } else {
-      // Select a new tool
       setIsTransitioning(true);
       setTimeout(() => {
         setSelectedTool(toolId);
@@ -245,10 +242,9 @@ const Tools = () => {
             A collection of essential tools to help you decode, convert, and analyze data for Capture The Flag challenges.
           </p>
           
-          {/* Search bar */}
           <div className="mt-6 max-w-md mx-auto">
             <div className="relative">
-              <input 
+              <Input 
                 type="text"
                 placeholder="Search tools..."
                 className="w-full py-2 px-4 pl-10 bg-cyber-dark/50 cyber-border rounded-full focus:outline-none focus:ring-2 focus:ring-cyber-blue/50"
